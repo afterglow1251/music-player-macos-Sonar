@@ -414,8 +414,8 @@ private struct MiniPlayerView: View {
                     // Scrolls when the title overflows, matching the main window's
                     // now-playing title. `.frame(maxWidth: .infinity)` gives the
                     // marquee all the room left after the fixed "show main" button.
-                    MarqueeText(text: controller.currentTrack?.displayTitle ?? "Nothing playing",
-                                fontSize: 12, weight: .semibold, color: .primary)
+                    MiniTitle(clock: clock, track: controller.currentTrack,
+                              isScrubbing: isScrubbing, scrubTime: scrubTime)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     // Hidden (not just disabled) while the main window is already
                     // frontmost — clicking it then would have nothing to do.
@@ -463,6 +463,7 @@ private struct MiniPlayerView: View {
             // and scroll-to-seek all come with it.
             WaveformSeekBar(clock: clock, waveforms: controller.waveforms,
                             engine: engine, accent: accent,
+                            chapters: controller.currentTrack?.chapters ?? [],
                             isScrubbing: $isScrubbing, scrubTime: $scrubTime,
                             seekHoverX: $seekHoverX,
                             height: 20, muted: .primary.opacity(0.25))
@@ -488,6 +489,35 @@ private struct MiniPlayerView: View {
         }
     }
 
+}
+
+/// The panel's title line — the main window's "Mix Title · Current Song" reading,
+/// panel-sized. A leaf that observes the clock, so the ~10 Hz chapter updates
+/// re-render just this marquee, not the whole panel (see `NowPlayingTitle`).
+private struct MiniTitle: View {
+    @ObservedObject var clock: PlaybackClock
+    let track: Track?
+    let isScrubbing: Bool
+    let scrubTime: TimeInterval
+
+    /// The "  ·  Current Chapter" suffix, or empty when the track isn't chaptered
+    /// or the current section has no title. Follows the scrub position while
+    /// scrubbing, matching the main window.
+    private var chapterSuffix: String {
+        guard let track, !track.chapters.isEmpty else { return "" }
+        let time = isScrubbing ? scrubTime : clock.currentTime
+        if let name = track.chapters.last(where: { $0.start <= time + 0.001 })?.title,
+           !name.isEmpty {
+            return "  ·  \(name)"
+        }
+        return ""
+    }
+
+    var body: some View {
+        MarqueeText(text: track?.displayTitle ?? "Nothing playing",
+                    fontSize: 12, weight: .semibold, color: .primary,
+                    suffix: chapterSuffix, suffixColor: Theme.logo)
+    }
 }
 
 /// The panel's elapsed/total corner labels. A leaf that observes the clock, so
