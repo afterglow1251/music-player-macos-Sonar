@@ -141,8 +141,8 @@ struct DownloadBar: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 4)
 
-            if !downloading && !downloader.isAvailable {
-                Text("yt-dlp not found — run: brew install yt-dlp")
+            if !downloading, let missing = downloader.missingToolMessage {
+                Text(missing)
                     .font(.system(size: 10))
                     .foregroundStyle(.orange.opacity(0.9))
                     .frame(maxWidth: .infinity, alignment: .leading)
