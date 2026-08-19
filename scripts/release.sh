@@ -32,17 +32,8 @@ DIST="dist"
 ZIP="$DIST/Sonar-$VERSION.zip"
 
 # ── build ─────────────────────────────────────────────────────────────────
-echo "▶ Building ${APP}…"
-./build-app.sh
-
-# ── stamp version ─────────────────────────────────────────────────────────
-# build-app.sh hardcodes 1.0; overwrite with the real version, then re-sign
-# (editing the bundle invalidates the ad-hoc signature build-app.sh applied).
-echo "▶ Stamping version ${VERSION}…"
-PLIST="$APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$PLIST"
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+echo "▶ Building ${APP} ${VERSION}…"
+./build-app.sh "$VERSION"
 
 # ── package ───────────────────────────────────────────────────────────────
 echo "▶ Packaging ${ZIP}…"
@@ -66,10 +57,13 @@ if ! gh auth status >/dev/null 2>&1; then
 fi
 
 echo "▶ Creating GitHub release ${TAG}…"
+# Not --prerelease: GitHub's /releases/latest — the link README sends people to —
+# skips pre-releases, so marking betas as such left that link resolving to the
+# bare release list instead of a download. "beta" lives in the title instead.
 gh release create "$TAG" "$ZIP" \
     --title "Sonar $VERSION (beta)" \
     --notes-file scripts/RELEASE_NOTES.md \
-    --prerelease
+    --latest
 
 echo "✓ Released. Share this link:"
 echo "  https://github.com/afterglow1251/music-player-macos-Sonar/releases/tag/$TAG"

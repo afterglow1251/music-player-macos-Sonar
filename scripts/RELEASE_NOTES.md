@@ -1,5 +1,26 @@
 Sonar — a native macOS Winamp-style music player. **Beta build.**
 
+## What's new in 0.3.0
+
+- **YouTube downloads work again.** YouTube started turning away anonymous
+  requests with *"Sign in to confirm you're not a bot"*, which broke every
+  download. Sonar now falls back to the cookies of a browser you're already
+  signed into, exactly as `yt-dlp` recommends.
+- **It picks the browser for you.** Rather than guessing, Sonar checks which
+  browser actually holds a signed-in YouTube session and uses the one you've
+  used most recently. Chrome, Edge, Brave, Vivaldi, Opera and Firefox are all
+  understood.
+  - Chromium-based browsers encrypt their cookies, so macOS will ask once for
+    permission to read the key — that's the Keychain prompt you'll see. Firefox
+    needs no prompt at all.
+  - The first attempt is always anonymous, so this only kicks in when YouTube
+    insists.
+- **Clearer failures.** Download errors now say what went wrong — rate
+  limiting, an age-restricted video, a missing tool — instead of pasting
+  `yt-dlp`'s raw output into the corner of the window.
+- **Missing `ffmpeg` is caught up front**, rather than halfway through a
+  download that was never going to finish.
+
 ## Install
 
 1. Download **`Sonar-<version>.zip`** below and unzip it.
