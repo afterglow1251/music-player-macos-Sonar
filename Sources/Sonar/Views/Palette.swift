@@ -118,12 +118,19 @@ struct VisualizerTheme: Identifiable, Equatable {
 
     /// Build a visualizer theme from an album cover: pick the cover's most vibrant
     /// color and fan it into a dark→bright, bottom-to-top gradient — the classic
-    /// tile look, tinted to match the artwork. Returns nil for covers with no
-    /// usable color (e.g. pure greyscale), so the caller can fall back to a preset.
-    static func fromArtwork(_ image: NSImage) -> VisualizerTheme? {
-        guard let accent = image.dominantVibrantColor() else { return nil }
+    /// tile look, tinted to match the artwork. A cover with no usable color (a
+    /// black-and-white photo, say) gets the neutral greyscale fan instead: that
+    /// still *matches the cover*, whereas falling back to whichever preset was
+    /// picked last made "Mixed" look stuck on that preset.
+    static func fromArtwork(_ image: NSImage) -> VisualizerTheme {
+        guard let accent = image.dominantVibrantColor() else { return neutral }
         return fromAccent(accent)
     }
+
+    /// The cover-derived theme for artwork that carries no hue — Mono's ramp
+    /// under the album name, so it reads as "mixed from a grey cover".
+    static let neutral = VisualizerTheme(
+        name: albumName, colors: mono.colors, peak: mono.peak, oscilloscope: mono.oscilloscope)
 
     /// Fan a single accent color into the 16-step bottom→top gradient plus a peak
     /// and oscilloscope color, matching the shape of the built-in presets.

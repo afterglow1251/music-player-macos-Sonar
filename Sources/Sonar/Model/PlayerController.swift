@@ -77,8 +77,8 @@ final class PlayerController: ObservableObject {
         }
     }
 
-    /// Theme derived from the current cover (nil when off, or the cover has no
-    /// usable color). Cached so tiles don't re-decode the artwork every frame.
+    /// Theme derived from the current cover (nil when off, or the track has no
+    /// cover at all). Cached so tiles don't re-decode the artwork every frame.
     @Published private(set) var derivedAlbumTheme: VisualizerTheme?
 
     var theme: VisualizerTheme {
