@@ -56,6 +56,14 @@ if ! gh auth status >/dev/null 2>&1; then
     exit 1
 fi
 
+# One release at a time: the page should show only the current build, so every
+# earlier release is removed first (its git tag stays — history is untouched).
+for old in $(gh release list --json tagName --jq '.[].tagName'); do
+    [ "$old" = "$TAG" ] && continue
+    echo "▶ Removing previous release ${old}…"
+    gh release delete "$old" --yes
+done
+
 echo "▶ Creating GitHub release ${TAG}…"
 # Not --prerelease: GitHub's /releases/latest — the link README sends people to —
 # skips pre-releases, so marking betas as such left that link resolving to the
