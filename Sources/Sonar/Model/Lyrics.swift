@@ -7,6 +7,55 @@ struct LyricLine: Identifiable, Hashable {
     let text: String
 }
 
+/// The song a lyrics lookup is about. Usually the whole file, but for a chaptered
+/// mix (a DJ set, a mashup compilation) each chapter is its own song: the file's
+/// title names the mix, so only the chapter title can find the right lyrics.
+struct LyricsSubject: Hashable, Sendable {
+    /// The audio file the lyrics belong to (keys the on-disk cache).
+    let url: URL
+    /// Which chapter of the file, or nil for the file as a whole.
+    let chapterIndex: Int?
+    /// What we know about the song: its (display) title, artist tag, and length.
+    let title: String
+    let artist: String
+    let duration: TimeInterval
+    /// Seconds into the file where this song starts — lyric timestamps are shifted
+    /// by this much so they line up with the file's clock. 0 for a whole file.
+    let offset: TimeInterval
+    /// Whether the length is the song's own. A chapter's span in a mix is only a
+    /// rough guide (songs get cut short or extended), so the strict duration match
+    /// is relaxed for it.
+    let strictDuration: Bool
+    /// Whether the title may read "Song - Artist" as well as "Artist - Title".
+    /// Chapter names in a mix come in either order.
+    let eitherDashOrder: Bool
+
+    /// The whole file as one song.
+    init(track: Track) {
+        url = track.url
+        chapterIndex = nil
+        title = track.displayTitle
+        artist = track.artist
+        duration = track.duration
+        offset = 0
+        strictDuration = true
+        eitherDashOrder = false
+    }
+
+    /// One chapter of a mix. The file's artist tag is deliberately dropped: on a
+    /// DJ set it names the DJ or the channel, not whoever sang this song.
+    init(track: Track, chapter index: Int) {
+        url = track.url
+        chapterIndex = index
+        title = track.chapters[index].title
+        artist = ""
+        duration = track.chapterDuration(at: index)
+        offset = track.chapters[index].start
+        strictDuration = false
+        eitherDashOrder = true
+    }
+}
+
 /// Where a track's synced lyrics come from, and how they're parsed.
 ///
 /// Lookup order: a cached `.lrc` in the hidden `.sonar/` folder beside the audio
@@ -15,52 +64,61 @@ struct LyricLine: Identifiable, Hashable {
 /// with our exact copy). A hit from the network is cached back to `.sonar/`.
 enum LyricsProvider {
 
-    /// Fetch synced lyrics for a track, or nil if none are available.
-    static func fetch(for track: Track) async -> [LyricLine]? {
-        if let local = cached(for: track) { return local }
-        return await fetchRemote(for: track)
+    /// Fetch synced lyrics for a song, or nil if none are available.
+    static func fetch(for subject: LyricsSubject) async -> [LyricLine]? {
+        if let local = cached(for: subject) { return local }
+        return await fetchRemote(for: subject)
     }
 
     /// Synchronous cache-only lookup — a fast local `.lrc` read, no network. Lets a
     /// caller show cached lyrics instantly (no loading spinner) and reserve the async
     /// network path for an actual cache miss.
-    static func cached(for track: Track) -> [LyricLine]? {
-        loadCache(for: track.url)
+    static func cached(for subject: LyricsSubject) -> [LyricLine]? {
+        loadCache(for: subject).map { shifted($0, by: subject.offset) }
     }
 
     /// Network lookup (LRCLIB) for a cache miss; caches the result on a hit.
-    static func fetchRemote(for track: Track) async -> [LyricLine]? {
-        guard let lines = await fetchFromLRCLIB(track) else { return nil }
-        writeCache(lines.raw, for: track.url)
-        return lines.parsed
+    static func fetchRemote(for subject: LyricsSubject) async -> [LyricLine]? {
+        guard let lines = await fetchFromLRCLIB(subject) else { return nil }
+        writeCache(lines.raw, for: subject)
+        return shifted(lines.parsed, by: subject.offset)
+    }
+
+    /// Move every timestamp later by `offset` — an LRC counts from the song's own
+    /// start, but a chapter's song starts partway into the file.
+    private static func shifted(_ lines: [LyricLine], by offset: TimeInterval) -> [LyricLine] {
+        offset == 0 ? lines : lines.map { LyricLine(time: $0.time + offset, text: $0.text) }
     }
 
     // MARK: On-disk cache (hidden `.sonar/lyrics/` folder beside the audio)
 
-    /// The cache file for a track: `<audio dir>/.sonar/lyrics/<audio filename>.lrc`.
-    /// A typed subfolder of the shared hidden `.sonar/` dir (alongside `waveforms/`
-    /// and the download `staging/`) keeps the music folder itself clean while the
-    /// cache still travels with the library and works offline. Keying on the full
-    /// filename (extension included) avoids collisions between same-named tracks of
-    /// different formats.
-    private static func cacheURL(for audio: URL) -> URL {
-        audio.deletingLastPathComponent()
+    /// The cache file for a song: `<audio dir>/.sonar/lyrics/<audio filename>.lrc`,
+    /// or `<audio filename>.ch<N>.lrc` for chapter N of a mix. A typed subfolder of
+    /// the shared hidden `.sonar/` dir (alongside `waveforms/` and the download
+    /// `staging/`) keeps the music folder itself clean while the cache still travels
+    /// with the library and works offline. Keying on the full filename (extension
+    /// included) avoids collisions between same-named tracks of different formats.
+    private static func cacheURL(for subject: LyricsSubject) -> URL {
+        let audio = subject.url
+        var name = audio.lastPathComponent
+        if let index = subject.chapterIndex { name += ".ch\(index)" }
+        return audio.deletingLastPathComponent()
             .appendingPathComponent(".sonar", isDirectory: true)
             .appendingPathComponent("lyrics", isDirectory: true)
-            .appendingPathComponent(audio.lastPathComponent)
+            .appendingPathComponent(name)
             .appendingPathExtension("lrc")
     }
 
-    private static func loadCache(for audio: URL) -> [LyricLine]? {
-        guard let text = try? String(contentsOf: cacheURL(for: audio), encoding: .utf8)
+    private static func loadCache(for subject: LyricsSubject) -> [LyricLine]? {
+        guard let text = try? String(contentsOf: cacheURL(for: subject), encoding: .utf8)
         else { return nil }
         let lines = parse(text)
         return lines.isEmpty ? nil : lines
     }
 
-    private static func writeCache(_ raw: String, for audio: URL) {
+    private static func writeCache(_ raw: String, for subject: LyricsSubject) {
         guard !raw.isEmpty else { return }
-        let url = cacheURL(for: audio)
+        let url = cacheURL(for: subject)
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                   withIntermediateDirectories: true)
         try? raw.write(to: url, atomically: true, encoding: .utf8)
@@ -68,20 +126,27 @@ enum LyricsProvider {
 
     // MARK: LRCLIB
 
-    private static func fetchFromLRCLIB(_ track: Track) async -> (raw: String, parsed: [LyricLine])? {
-        guard let lk = lookup(for: track) else { return nil }
+    private static func fetchFromLRCLIB(_ subject: LyricsSubject) async -> (raw: String, parsed: [LyricLine])? {
+        let lookups = lookups(for: subject)
+        guard !lookups.isEmpty else { return nil }
 
         // 1. Exact /api/get on each candidate (artist, title) — precise and cheap when
-        //    the tags (or a clean "Artist - Title" display name) are accurate.
-        for artist in lk.artists {
-            if let hit = await lrclibGetExact(artist: artist, title: lk.title,
-                                              duration: track.duration) {
-                return hit
+        //    the tags (or a clean "Artist - Title" display name) are accurate. Only
+        //    pinned to the duration when it's the song's own.
+        for lk in lookups {
+            for artist in lk.artists {
+                if let hit = await lrclibGetExact(artist: artist, title: lk.title,
+                                                  duration: subject.strictDuration ? subject.duration : 0) {
+                    return hit
+                }
             }
         }
         // 2. Fuzzy search fallback for messy names, but only ACCEPT a result that
-        //    verifiably matches this track. Better no lyrics than someone else's.
-        return await lrclibSearch(lk, track: track)
+        //    verifiably matches this song. Better no lyrics than someone else's.
+        for lk in lookups {
+            if let hit = await lrclibSearch(lk, subject: subject) { return hit }
+        }
+        return nil
     }
 
     /// Exact lookup by artist + title. Tries with the duration first (LRCLIB's most
@@ -118,7 +183,7 @@ enum LyricsProvider {
     ///      highest-recall option for collab names however they're joined server-side.
     ///   2. Free-text `q=` with a separator-normalized artist + title — a broader net.
     ///   3. Title alone, but only when we have no artist at all (the gate guards it).
-    private static func lrclibSearch(_ lk: Lookup, track: Track) async -> (raw: String, parsed: [LyricLine])? {
+    private static func lrclibSearch(_ lk: Lookup, subject: LyricsSubject) async -> (raw: String, parsed: [LyricLine])? {
         var queries: [SearchQuery] = []
         for artist in lk.artists {
             queries.append(SearchQuery(track: lk.title, artist: normalizeArtist(artist)))
@@ -135,12 +200,12 @@ enum LyricsProvider {
             let candidates = results.filter {
                 !($0.syncedLyrics ?? "").isEmpty
                     && isConfidentMatch(title: $0.trackName ?? "", artist: $0.artistName ?? "",
-                                        duration: $0.duration, track: track)
+                                        duration: $0.duration, subject: subject)
             }
             guard !candidates.isEmpty else { continue }
-            let best = track.duration > 0
-                ? candidates.min { abs(($0.duration ?? .greatestFiniteMagnitude) - track.duration)
-                                 < abs(($1.duration ?? .greatestFiniteMagnitude) - track.duration) }!
+            let best = subject.duration > 0
+                ? candidates.min { abs(($0.duration ?? .greatestFiniteMagnitude) - subject.duration)
+                                 < abs(($1.duration ?? .greatestFiniteMagnitude) - subject.duration) }!
                 : candidates[0]
             if let raw = best.syncedLyrics {
                 let parsed = parse(raw)
@@ -167,17 +232,19 @@ enum LyricsProvider {
 
     // MARK: Match confidence
 
-    /// Whether a search result is really *this* track. Rejects wrong-song matches
+    /// Whether a search result is really *this* song. Rejects wrong-song matches
     /// (different length, or a title whose words we don't have) so a fuzzy search
     /// can't surface an unrelated song's lyrics.
     private static func isConfidentMatch(title candTitle: String, artist candArtist: String,
-                                         duration candDuration: Double?, track: Track) -> Bool {
+                                         duration candDuration: Double?, subject: LyricsSubject) -> Bool {
         // Duration gate — LRCLIB lengths are per-recording accurate; a big gap means
-        // a different song. Enforced only when both lengths are known.
-        if track.duration > 0, let d = candDuration, abs(d - track.duration) > 8 { return false }
+        // a different song. Enforced only when both lengths are known and the
+        // subject's length is its own (a chapter's span in a mix is not).
+        if subject.strictDuration, subject.duration > 0, let d = candDuration,
+           abs(d - subject.duration) > 8 { return false }
 
-        // What we actually know about the track: words from its title AND artist tag.
-        let known = tokens(track.displayTitle).union(tokens(track.artist))
+        // What we actually know about the song: words from its title AND artist tag.
+        let known = tokens(subject.title).union(tokens(subject.artist))
         let candTitleTokens = tokens(candTitle)
         guard !known.isEmpty, !candTitleTokens.isEmpty else { return false }
 
@@ -213,25 +280,39 @@ enum LyricsProvider {
         var q: String?
     }
 
-    /// Normalized lookup terms for a track: a cleaned title plus candidate artist
+    /// Normalized lookup terms for a song: a cleaned title plus candidate artist
     /// strings, best guess first — the file's own artist tag, then any "Artist - Title"
-    /// prefix packed into the display name (YouTube style). nil when there's no title
-    /// to search on.
+    /// prefix packed into the display name (YouTube style).
     private struct Lookup {
         let title: String
         let artists: [String]
     }
 
-    private static func lookup(for track: Track) -> Lookup? {
-        let raw = track.displayTitle.trimmingCharacters(in: .whitespaces)
-        guard !raw.isEmpty else { return nil }
+    /// The lookups to try for a subject, in order. One for a plain track; for a mix
+    /// chapter whose name has a dash, a second with the halves swapped, since
+    /// tracklists write "Dynamite - Taio Cruz" as often as "Taio Cruz - Dynamite".
+    /// Empty when there's no title to search on.
+    private static func lookups(for subject: LyricsSubject) -> [Lookup] {
+        let raw = subject.title.trimmingCharacters(in: .whitespaces)
+        guard !raw.isEmpty else { return [] }
 
-        let dash = raw.range(of: " - ")
-        let title = clean(dash.map { String(raw[$0.upperBound...]) } ?? raw)
+        guard let dash = raw.range(of: " - ") else {
+            return [lookup(title: raw, artists: [subject.artist])].compactMap { $0 }
+        }
+        let before = String(raw[..<dash.lowerBound])
+        let after = String(raw[dash.upperBound...])
+        var out = [lookup(title: after, artists: [subject.artist, before])]
+        if subject.eitherDashOrder {
+            out.append(lookup(title: before, artists: [subject.artist, after]))
+        }
+        return out.compactMap { $0 }
+    }
+
+    private static func lookup(title rawTitle: String, artists candidates: [String]) -> Lookup? {
+        let title = clean(rawTitle)
         guard !title.isEmpty else { return nil }
-
         var artists: [String] = []
-        for candidate in [track.artist, dash.map { String(raw[..<$0.lowerBound]) } ?? ""] {
+        for candidate in candidates {
             let a = candidate.trimmingCharacters(in: .whitespaces)
             if !a.isEmpty, !artists.contains(where: { $0.caseInsensitiveCompare(a) == .orderedSame }) {
                 artists.append(a)

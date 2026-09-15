@@ -40,7 +40,7 @@ final class PlayerController: ObservableObject {
     @Published private(set) var currentTrack: Track? {
         didSet {
             if currentTrack?.url != oldValue?.url {
-                lyrics.load(for: currentTrack)
+                lyrics.load(for: currentTrack, at: engine.currentTime)
                 waveforms.load(for: currentTrack)
             }
             if currentTrack?.artworkData != oldValue?.artworkData { refreshAlbumTheme() }
@@ -118,6 +118,7 @@ final class PlayerController: ObservableObject {
         restorePreferences()
 
         engine.onFinished = { [weak self] in self?.next(auto: true) }
+        lyrics.follow(engine.clock)
 
         // Gapless: the engine preloads the next track and, when it advances to it
         // seamlessly, asks us to reconcile state without a reload.

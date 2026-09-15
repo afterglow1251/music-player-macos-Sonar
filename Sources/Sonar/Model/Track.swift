@@ -49,6 +49,20 @@ struct Track: Identifiable, Hashable, Sendable {
 
     var url: URL { id }
 
+    /// Index of the chapter playing at `time` — the last one whose start has
+    /// passed — or nil for an unchaptered track / a position before the first
+    /// marker. The small tolerance absorbs float drift on an exact boundary.
+    func chapterIndex(at time: TimeInterval) -> Int? {
+        chapters.lastIndex { $0.start <= time + 0.001 }
+    }
+
+    /// How long chapter `index` lasts: up to the next marker, or to the end of the
+    /// file for the last one (0 when the file's length is unknown).
+    func chapterDuration(at index: Int) -> TimeInterval {
+        let end = index + 1 < chapters.count ? chapters[index + 1].start : duration
+        return max(0, end - chapters[index].start)
+    }
+
     /// The YouTube watch URL this track was downloaded from, reconstructed from
     /// its `videoID`. nil for hand-added / non-YouTube files — the caller uses
     /// this to decide whether to offer an "Open on YouTube" affordance.

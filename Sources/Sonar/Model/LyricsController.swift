@@ -2,7 +2,13 @@ import Foundation
 import Combine
 
 /// Holds the synced lyrics for whatever's playing, fetching them (local `.lrc`
-/// first, then LRCLIB) whenever the track changes.
+/// first, then LRCLIB) whenever the song changes.
+///
+/// For a plain file the song is the track. For a chaptered mix (a DJ set, a
+/// mashup compilation) each chapter is its own song, so the controller follows the
+/// playback clock and swaps lyrics as playback crosses into the next chapter —
+/// looking each one up by its chapter title, with timestamps shifted to the
+/// chapter's start so they line up with the file's clock.
 @MainActor
 final class LyricsController: ObservableObject {
     enum State: Equatable {
@@ -15,29 +21,56 @@ final class LyricsController: ObservableObject {
     @Published private(set) var state: State = .idle
     @Published private(set) var lines: [LyricLine] = []
 
+    private var track: Track?
     private var loadTask: Task<Void, Never>?
-    private var loadedURL: URL?
+    private var loaded: LyricsSubject?
+    private var clockSubscription: AnyCancellable?
 
-    /// Fetch lyrics for a track (or clear them for nil). No-op if the same track is
+    /// Follow the playback clock so a chaptered mix reloads lyrics as the section
+    /// changes. Cheap: every tick only compares a chapter index; nothing is
+    /// published unless the song actually changed.
+    func follow(_ clock: PlaybackClock) {
+        clockSubscription = clock.$currentTime.sink { [weak self] time in
+            guard let self, let track, !track.chapters.isEmpty else { return }
+            self.reload(for: track, at: time)
+        }
+    }
+
+    /// Fetch lyrics for a track (or clear them for nil) at playback position
+    /// `time` — which picks the chapter for a mix. No-op if the same song is
     /// already loaded, so seeking/pausing doesn't refetch.
-    func load(for track: Track?) {
+    func load(for track: Track?, at time: TimeInterval = 0) {
+        self.track = track
         guard let track else {
             loadTask?.cancel()
-            loadedURL = nil
+            loaded = nil
             lines = []
             state = .idle
             return
         }
-        guard track.url != loadedURL else { return }
+        reload(for: track, at: time)
+    }
+
+    private func reload(for track: Track, at time: TimeInterval) {
+        let subject = track.chapterIndex(at: time)
+            .map { LyricsSubject(track: track, chapter: $0) } ?? LyricsSubject(track: track)
+        guard subject != loaded else { return }
 
         loadTask?.cancel()
-        loadedURL = track.url
+        loaded = subject
+
+        // An untitled chapter names nothing to search for.
+        if subject.chapterIndex != nil, subject.title.trimmingCharacters(in: .whitespaces).isEmpty {
+            lines = []
+            state = .unavailable
+            return
+        }
 
         // Cache first — a fast synchronous local read. On a hit the lyrics appear in
-        // the same update as the track change: no spinner, no flash, and the previous
+        // the same update as the song change: no spinner, no flash, and the previous
         // song's text is replaced outright rather than lingering. Most switches hit
-        // this path (a track played once is cached beside its file).
-        if let cached = LyricsProvider.cached(for: track) {
+        // this path (a song played once is cached beside its file).
+        if let cached = LyricsProvider.cached(for: subject) {
             lines = cached
             state = .loaded
             return
@@ -48,8 +81,8 @@ final class LyricsController: ObservableObject {
         lines = []
         state = .loading
         loadTask = Task { [weak self] in
-            let fetched = await LyricsProvider.fetchRemote(for: track)
-            guard !Task.isCancelled, let self, self.loadedURL == track.url else { return }
+            let fetched = await LyricsProvider.fetchRemote(for: subject)
+            guard !Task.isCancelled, let self, self.loaded == subject else { return }
             if let fetched {
                 self.lines = fetched
                 self.state = .loaded
