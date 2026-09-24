@@ -114,16 +114,14 @@ struct SettingsView: View {
                         controller.albumTheme = false
                         controller.themeIndex = index
                     } label: {
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(LinearGradient(colors: [theme.colors.first ?? .green,
-                                                          theme.colors[theme.colors.count / 2],
-                                                          theme.colors.last ?? .red],
-                                                 startPoint: .bottom, endPoint: .top))
-                            .frame(width: 26, height: 26)
-                            .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .stroke(.white, lineWidth: selected ? 2 : 0))
-                            .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .stroke(.white.opacity(0.15), lineWidth: selected ? 0 : 1))
+                        // A round swatch with the theme washed corner to corner,
+                        // like the landing page's theme dots.
+                        swatch(selected: selected) {
+                            Circle().fill(LinearGradient(colors: [theme.colors.first ?? .green,
+                                                                  theme.colors[theme.colors.count / 2],
+                                                                  theme.colors.last ?? .red],
+                                                         startPoint: .bottomLeading, endPoint: .topTrailing))
+                        }
                     }
                     .buttonStyle(PressableButtonStyle())
                     .onHover { hoveredTheme = $0 ? index : nil }
@@ -138,23 +136,30 @@ struct SettingsView: View {
     private var albumSwatch: some View {
         let selected = controller.albumTheme
         return Button { controller.albumTheme = true } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(LinearGradient(colors: [Color(white: 0.26), Color(white: 0.14)],
-                                         startPoint: .top, endPoint: .bottom))
-                Image(systemName: "wand.and.stars")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
+            swatch(selected: selected) {
+                ZStack {
+                    Circle().fill(LinearGradient(colors: [Color(white: 0.26), Color(white: 0.14)],
+                                                 startPoint: .top, endPoint: .bottom))
+                    // `sparkles`, not `wand.and.stars`: the wand's diagonal made the
+                    // glyph read off-centre in a round swatch.
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.9))
+                }
             }
-            .frame(width: 26, height: 26)
-            .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .stroke(.white, lineWidth: selected ? 2 : 0))
-            .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .stroke(.white.opacity(0.15), lineWidth: selected ? 0 : 1))
         }
         .buttonStyle(PressableButtonStyle())
         .onHover { hoveredAlbum = $0 }
         .help("Mixes the tile colors from the current song's cover")
+    }
+
+    /// A theme swatch's frame: a 28 pt circle, ringed in white when selected and
+    /// with a faint hairline otherwise so dark swatches keep an edge.
+    private func swatch<Fill: View>(selected: Bool, @ViewBuilder fill: () -> Fill) -> some View {
+        fill()
+            .frame(width: 28, height: 28)
+            .overlay(Circle().strokeBorder(.white, lineWidth: selected ? 2 : 0))
+            .overlay(Circle().strokeBorder(.white.opacity(0.15), lineWidth: selected ? 0 : 1))
     }
 
     /// Name shown beside the section title, tracking hover then selection.
