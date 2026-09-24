@@ -138,8 +138,10 @@ extension PlayerWindow {
             goToCurrentTrack()
         } label: {
             HStack(spacing: 5) {
-                NowPlayingBars(color: Theme.logo,
-                               animating: engine.isPlaying && windowOcclusion.isVisible)
+                // Still here on purpose: the playing row in the list carries the
+                // moving bars. One animated "now playing" mark is enough — two in
+                // view at once just split the eye.
+                NowPlayingBars(color: Theme.logo, animating: false)
                 // The source keeps naming the playlist/library even while a queued
                 // track is playing — the queue is an overlay on it — so a muted
                 // "· from queue" note carries that fact instead of a separate badge.

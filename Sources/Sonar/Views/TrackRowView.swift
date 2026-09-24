@@ -63,12 +63,19 @@ struct TrackRowView: View {
     var body: some View {
         HStack(spacing: 10) {
             // The note doubles as the favorite marker: pink on favorited rows.
-            // The current track keeps the accent speaker/note — "playing" outranks
-            // "favorited", and that row is already highlighted anyway.
-            Image(systemName: isCurrent && isPlaying ? "speaker.wave.2.fill" : "music.note")
-                .font(.system(size: 10))
-                .foregroundStyle(isCurrent ? accent : isFavorite ? Theme.favorite : .white.opacity(0.4))
-                .frame(width: 16)
+            // The current track's note comes alive instead — the same dancing bars
+            // as "Playing from", in accent, holding still while paused. "Playing"
+            // outranks "favorited", and that row is already highlighted anyway.
+            Group {
+                if isCurrent {
+                    NowPlayingBars(color: accent, animating: isPlaying)
+                } else {
+                    Image(systemName: "music.note")
+                        .font(.system(size: 10))
+                        .foregroundStyle(isFavorite ? Theme.favorite : .white.opacity(0.4))
+                }
+            }
+            .frame(width: 16)
             VStack(alignment: .leading, spacing: 1) {
                 Text(track.displayTitle)
                     .font(.system(size: 12, weight: isCurrent ? .semibold : .regular))
