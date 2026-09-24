@@ -58,17 +58,18 @@ enum ElevenLabsSync {
         guard let key = ElevenLabsKey.read() else { throw Failure.noKey }
         let audio = try await audioFile(for: subject)
         defer { if audio != subject.url { try? FileManager.default.removeItem(at: audio) } }
+        try Task.checkCancellation()
 
         let hasText = lines.contains { !$0.text.trimmingCharacters(in: .whitespaces).isEmpty }
         if hasText {
             let text = lines.map(\.text).joined(separator: "\n")
             let response: AlignmentResponse = try await post(
-                "forced-alignment", key: key, audio: audio, fields: ["text": text])
+                "forced-alignment", key: key, audio: audio, duration: subject.duration, fields: ["text": text])
             return try build(lines, words: response.words.filter { !$0.text.allSatisfy(\.isWhitespace) },
                              characters: response.characters)
         } else {
             let response: TranscriptResponse = try await post(
-                "speech-to-text", key: key, audio: audio,
+                "speech-to-text", key: key, audio: audio, duration: subject.duration,
                 fields: ["model_id": "scribe_v1", "timestamps_granularity": "character",
                          "tag_audio_events": "false"])
             let words = response.words.filter { $0.type == "word" }
@@ -285,31 +286,43 @@ enum ElevenLabsSync {
         let words: [TranscriptWord]
     }
 
+    /// Rough cost of timing `duration` seconds of audio — ElevenLabs bills alignment
+    /// and transcription alike, per hour. For the "this will cost…" confirmation.
+    static func estimatedCost(of duration: TimeInterval) -> Double {
+        duration / 3600 * 0.22
+    }
+
     /// Multipart POST of `audio` + `fields` to an ElevenLabs endpoint, decoding
     /// the JSON reply or mapping the failure to something a person can act on.
+    ///
+    /// The body is written to a temporary file and uploaded from there, so only a
+    /// few MB are ever in memory — a multi-hour file would otherwise be held twice
+    /// over (read in, then copied into the body). The idle timeout grows with the
+    /// audio's length: the server is silent while it works, and a long file can
+    /// take minutes. Cancelling the calling task cancels the upload.
     private static func post<T: Decodable>(_ endpoint: String, key: String, audio: URL,
-                                           fields: [String: String]) async throws -> T {
-        guard let url = URL(string: "https://api.elevenlabs.io/v1/\(endpoint)"),
-              let audioData = try? Data(contentsOf: audio) else { throw Failure.network }
+                                           duration: TimeInterval, fields: [String: String]) async throws -> T {
+        guard let url = URL(string: "https://api.elevenlabs.io/v1/\(endpoint)") else { throw Failure.network }
         let boundary = "sonar-\(UUID().uuidString)"
-        var body = Data()
-        func append(_ string: String) { body.append(Data(string.utf8)) }
-        for (name, value) in fields {
-            append("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n")
-        }
-        append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"\(audio.lastPathComponent)\"\r\n")
-        append("Content-Type: application/octet-stream\r\n\r\n")
-        body.append(audioData)
-        append("\r\n--\(boundary)--\r\n")
+        let body = try multipartBody(audio: audio, fields: fields, boundary: boundary)
+        defer { try? FileManager.default.removeItem(at: body) }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(key, forHTTPHeaderField: "xi-api-key")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 300
+        // 5 min, plus a minute per half hour of audio.
+        request.timeoutInterval = 300 + 60 * (max(duration, 0) / 1800).rounded(.up)
 
-        guard let (data, response) = try? await URLSession.shared.upload(for: request, from: body),
-              let status = (response as? HTTPURLResponse)?.statusCode else { throw Failure.network }
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.upload(for: request, fromFile: body)
+        } catch {
+            try Task.checkCancellation()   // a cancel isn't a network failure
+            throw Failure.network
+        }
+        guard let status = (response as? HTTPURLResponse)?.statusCode else { throw Failure.network }
         switch status {
         case 200:
             guard let decoded = try? JSONDecoder().decode(T.self, from: data) else {
@@ -324,6 +337,34 @@ enum ElevenLabsSync {
         default:
             throw Failure.server(errorMessage(in: data) ?? "HTTP \(status)")
         }
+    }
+
+    /// Write the multipart body to a temporary file, copying the audio across in
+    /// 4 MB chunks (checking for a cancel between them).
+    static func multipartBody(audio: URL, fields: [String: String], boundary: String) throws -> URL {
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("sonar-upload-\(UUID().uuidString)")
+        guard FileManager.default.createFile(atPath: out.path, contents: nil),
+              let writer = try? FileHandle(forWritingTo: out),
+              let reader = try? FileHandle(forReadingFrom: audio) else { throw Failure.network }
+        defer { try? writer.close(); try? reader.close() }
+        do {
+            func write(_ string: String) throws { try writer.write(contentsOf: Data(string.utf8)) }
+            for (name, value) in fields {
+                try write("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n")
+            }
+            try write("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"\(audio.lastPathComponent)\"\r\n")
+            try write("Content-Type: application/octet-stream\r\n\r\n")
+            while let chunk = try reader.read(upToCount: 4 << 20), !chunk.isEmpty {
+                try Task.checkCancellation()
+                try writer.write(contentsOf: chunk)
+            }
+            try write("\r\n--\(boundary)--\r\n")
+        } catch {
+            try? FileManager.default.removeItem(at: out)
+            if error is CancellationError { throw error }
+            throw Failure.server("couldn't prepare the upload")
+        }
+        return out
     }
 
     private static func quotaMessage(in data: Data) -> Bool {

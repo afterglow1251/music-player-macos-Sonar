@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import Sonar
 
 @Suite struct ElevenLabsSyncTests {
@@ -90,5 +91,19 @@ import Testing
         let out = try ElevenLabsSync.build([Line(text: text, time: nil)], words: words, characters: chars)
         #expect(out.lrc == "[00:01.10]<00:01.10>Run <00:01.50>— <00:01.70>now\n")
         #expect(out.letters?.count == 3)
+    }
+
+    @Test func writesTheMultipartBodyToDisk() throws {
+        let audio = FileManager.default.temporaryDirectory.appendingPathComponent("sonar-test-\(UUID().uuidString).m4a")
+        let bytes = Data((0..<(9 << 20)).map { UInt8($0 % 251) })   // 9 MB: spans several 4 MB chunks
+        try bytes.write(to: audio)
+        defer { try? FileManager.default.removeItem(at: audio) }
+
+        let body = try ElevenLabsSync.multipartBody(audio: audio, fields: ["text": "Take me away"], boundary: "B")
+        defer { try? FileManager.default.removeItem(at: body) }
+        let data = try Data(contentsOf: body)
+        let head = Data("--B\r\nContent-Disposition: form-data; name=\"text\"\r\n\r\nTake me away\r\n--B\r\nContent-Disposition: form-data; name=\"file\"; filename=\"\(audio.lastPathComponent)\"\r\nContent-Type: application/octet-stream\r\n\r\n".utf8)
+        let tail = Data("\r\n--B--\r\n".utf8)
+        #expect(data == head + bytes + tail)
     }
 }

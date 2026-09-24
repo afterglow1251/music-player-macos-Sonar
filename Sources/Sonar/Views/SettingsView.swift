@@ -227,7 +227,7 @@ struct SettingsView: View {
                             .foregroundStyle(.white.opacity(0.6))
                     }
                 }
-                Text(keyError ?? "Needs Forced Alignment + Speech to Text access · ≈ $0.01 per song")
+                Text(keyError ?? "Needs Forced Alignment + Speech to Text access. About $0.01 per song.")
                     .font(.system(size: 9))
                     .foregroundStyle(.white.opacity(0.35))
             }

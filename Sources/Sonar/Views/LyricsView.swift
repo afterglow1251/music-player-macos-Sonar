@@ -31,6 +31,16 @@ struct LyricsView: View {
     @State private var isSyncing = false
     /// Why the last word sync failed, shown until the next attempt or song.
     @State private var syncError: String?
+    /// The running sync, so it can be cancelled.
+    @State private var syncTask: Task<Void, Never>?
+    /// Which sync is current — a cancelled one finishing late mustn't reset the
+    /// state of one started after it.
+    @State private var syncRun = UUID()
+    /// Audio length awaiting a go-ahead: a long track is confirmed (with its cost)
+    /// before anything is sent.
+    @State private var pendingSyncDuration: TimeInterval?
+    /// Tracks longer than this ask first.
+    private static let confirmAbove: TimeInterval = 15 * 60
 
     private var activeIndex: Int? {
         controller.lyrics.activeIndex(at: clock.currentTime)
@@ -48,6 +58,7 @@ struct LyricsView: View {
         .onChange(of: controller.currentTrack?.url) { _, _ in
             isReplacing = false
             syncError = nil
+            pendingSyncDuration = nil
         }
     }
 
@@ -62,17 +73,32 @@ struct LyricsView: View {
             // The lookup goes by the song's name, which can miss — let the user
             // point at the right lyrics instead: paste a link, or pick a file.
             if isSyncing {
-                status(spinner: true, "Syncing words…")
+                VStack(spacing: 10) {
+                    status(spinner: true, "Syncing words…")
+                    Button("Cancel", action: cancelSync)
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.45))
+                }
             } else {
                 VStack(spacing: 14) {
                     status("No synced lyrics found")
                     // ElevenLabs can time the words itself — from LRCLIB's plain
                     // lyrics when there are some, else by listening.
+                    // The button and its long-track confirmation share one fixed-height
+                    // slot, so swapping them doesn't nudge everything below.
                     if elevenLabs.isSet {
-                        Button("Sync with ElevenLabs", action: syncWords)
-                            .buttonStyle(.plain)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(accent)
+                        Group {
+                            if let pending = pendingSyncDuration {
+                                confirmation(pending)
+                            } else {
+                                Button("Sync with ElevenLabs", action: syncWords)
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(accent)
+                            }
+                        }
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(height: 18)
                     }
                     if let syncError { note(syncError) }
                     importForm
@@ -109,8 +135,13 @@ struct LyricsView: View {
                                     HStack(spacing: 6) {
                                         ProgressView().controlSize(.mini).tint(.white.opacity(0.7))
                                         Text("Syncing words…")
+                                        Button("Cancel", action: cancelSync)
+                                            .buttonStyle(.plain)
+                                            .foregroundStyle(.white.opacity(0.45))
                                     }
                                 }
+                            } else if let pending = pendingSyncDuration {
+                                pill { confirmation(pending) }
                             } else if let syncError {
                                 pill { Text(syncError) }
                             } else if isHovering {
@@ -193,20 +224,66 @@ struct LyricsView: View {
     }
 
     /// Time the playing song word by word through ElevenLabs (see
-    /// `LyricsController.syncWords`).
+    /// `LyricsController.syncWords`). A long track asks first, showing its cost.
     private func syncWords() {
         guard !isSyncing else { return }
+        let time = clock.currentTime
+        if let duration = controller.lyrics.syncDuration(at: time), duration > Self.confirmAbove {
+            pendingSyncDuration = duration
+            return
+        }
+        startSync(at: time)
+    }
+
+    private func startSync(at time: TimeInterval) {
+        pendingSyncDuration = nil
         isSyncing = true
         syncError = nil
-        let time = clock.currentTime
-        Task {
+        let run = UUID()
+        syncRun = run
+        syncTask = Task {
+            var failure: String?
             do {
                 try await controller.lyrics.syncWords(at: time)
+            } catch is CancellationError {
+                // Cancelled by the user — nothing to report.
             } catch {
-                syncError = error.localizedDescription
+                failure = error.localizedDescription
             }
+            guard syncRun == run else { return }
+            syncError = failure
             isSyncing = false
+            syncTask = nil
         }
+    }
+
+    /// Stop a running sync. The upload is cut off and nothing is saved; if the
+    /// audio had already reached ElevenLabs it may still count against the quota.
+    private func cancelSync() {
+        syncTask?.cancel()
+        syncTask = nil
+        isSyncing = false
+    }
+
+    /// "2:34:10 of audio, about $0.57   Sync   Cancel" — the go-ahead for a long track.
+    private func confirmation(_ duration: TimeInterval) -> some View {
+        HStack(spacing: 10) {
+            Text("\(Self.hms(duration)) of audio, about \(String(format: "$%.2f", ElevenLabsSync.estimatedCost(of: duration)))")
+                .foregroundStyle(.white.opacity(0.7))
+            Button("Sync") { startSync(at: clock.currentTime) }
+                .buttonStyle(.plain)
+                .foregroundStyle(accent)
+            Button("Cancel") { pendingSyncDuration = nil }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white.opacity(0.45))
+        }
+    }
+
+    /// "2:34:10" / "47:05" — hours only when there are some.
+    private static func hms(_ t: TimeInterval) -> String {
+        let s = Int(t.rounded())
+        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
+                         : String(format: "%d:%02d", s / 60, s % 60)
     }
 
     private var scroller: some View {

@@ -112,6 +112,12 @@ final class LyricsController: ObservableObject {
     /// …and real per-letter timing too — what the Letters fill needs.
     var hasLetterTimings: Bool { lines.contains { $0.words.contains { !$0.letters.isEmpty } } }
 
+    /// How much audio a sync at `time` would send — the chapter's length in a
+    /// mix, else the whole track's. Nil with nothing loaded.
+    func syncDuration(at time: TimeInterval) -> TimeInterval? {
+        track.map { Self.subject(for: $0, at: time).duration }
+    }
+
     /// Time the song playing at `time` word by word through ElevenLabs and show the
     /// result. Uses the best text there is: the lyrics already on screen (their
     /// line times are kept as a fallback), else LRCLIB's plain lyrics, else none —
@@ -131,6 +137,7 @@ final class LyricsController: ObservableObject {
             source = []
         }
         let timed = try await ElevenLabsSync.timedLyrics(for: subject, lines: source)
+        try Task.checkCancellation()   // cancelled while it was in flight: keep nothing
         show(try LyricsProvider.install(timed.lrc, for: subject, letters: timed.letters), for: subject)
     }
 
