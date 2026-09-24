@@ -138,7 +138,7 @@ struct LyricsView: View {
                     // bottom inset so the last line can still center during playback.
                     Color.clear.frame(height: 24)
                     ForEach(Array(controller.lyrics.lines.enumerated()), id: \.element.id) { index, line in
-                        lineView(line.text, active: index == activeIndex)
+                        lineView(line, active: index == activeIndex)
                             .id(index)
                             .onTapGesture { engine.seek(to: line.time) }
                     }
@@ -163,12 +163,29 @@ struct LyricsView: View {
         }
     }
 
-    private func lineView(_ text: String, active: Bool) -> some View {
-        Text(text.isEmpty ? "♪" : text)
+    private func lineView(_ line: LyricLine, active: Bool) -> some View {
+        lineText(line, active: active)
             .font(.system(size: active ? 17 : 15, weight: active ? .bold : .medium))
-            .foregroundStyle(active ? accent : .white.opacity(0.4))
             .fixedSize(horizontal: false, vertical: true)
             .animation(.easeInOut(duration: 0.2), value: active)
+    }
+
+    /// The line's text, coloured. Karaoke on the active line of an Enhanced LRC:
+    /// words already sung fill in accent, the rest wait in white. A plain
+    /// line-synced LRC lights the whole active line at once; inactive lines dim.
+    private func lineText(_ line: LyricLine, active: Bool) -> Text {
+        guard !line.text.isEmpty else {
+            return Text("♪").foregroundStyle(active ? accent : .white.opacity(0.4))
+        }
+        guard active else { return Text(line.text).foregroundStyle(.white.opacity(0.4)) }
+        guard !line.words.isEmpty else { return Text(line.text).foregroundStyle(accent) }
+        let now = clock.currentTime
+        return line.words.enumerated().reduce(Text("")) { text, item in
+            let (i, word) = item
+            let sung = word.time <= now
+            return text + Text(i == 0 ? word.text : " " + word.text)
+                .foregroundStyle(sung ? accent : .white.opacity(0.85))
+        }
     }
 
     /// Paste a link to synced lyrics; ↩ or the arrow downloads it.

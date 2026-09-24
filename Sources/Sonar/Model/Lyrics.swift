@@ -5,6 +5,16 @@ struct LyricLine: Identifiable, Hashable {
     let id = UUID()
     let time: TimeInterval   // seconds from the start of the track
     let text: String
+    /// Per-word timing, when the LRC is "Enhanced" (`<mm:ss.xx>` before each
+    /// word) — drives the karaoke fill across the active line. Empty for a
+    /// plain line-synced LRC, which highlights the line as a whole.
+    var words: [LyricWord] = []
+}
+
+/// One word of an Enhanced-LRC line and when it's sung.
+struct LyricWord: Hashable {
+    let time: TimeInterval
+    let text: String
 }
 
 /// The song a lyrics lookup is about. Usually the whole file, but for a chaptered
@@ -178,7 +188,10 @@ enum LyricsProvider {
     /// Move every timestamp later by `offset` — an LRC counts from the song's own
     /// start, but a chapter's song starts partway into the file.
     private static func shifted(_ lines: [LyricLine], by offset: TimeInterval) -> [LyricLine] {
-        offset == 0 ? lines : lines.map { LyricLine(time: $0.time + offset, text: $0.text) }
+        offset == 0 ? lines : lines.map { line in
+            LyricLine(time: line.time + offset, text: line.text,
+                      words: line.words.map { LyricWord(time: $0.time + offset, text: $0.text) })
+        }
     }
 
     // MARK: On-disk cache (hidden `.sonar/lyrics/` folder beside the audio)
@@ -478,19 +491,41 @@ enum LyricsProvider {
 
             // The lyric text is whatever follows the last timestamp on the line.
             let textStart = stamps.map(\.range.upperBound).max()!
-            let content = line[textStart...].trimmingCharacters(in: .whitespaces)
+            let (content, words) = words(in: String(line[textStart...]))
 
             for stamp in stamps {
-                let minutes = Double(stamp.1) ?? 0
-                let seconds = Double(stamp.2) ?? 0
-                let fraction = stamp.3.map { frac -> Double in
-                    // "5" → .5, "05" → .05, "050" → .050
-                    (Double(frac) ?? 0) / pow(10, Double(frac.count))
-                } ?? 0
-                out.append(LyricLine(time: minutes * 60 + seconds + fraction, text: content))
+                out.append(LyricLine(time: seconds(stamp.1, stamp.2, stamp.3), text: content, words: words))
             }
         }
         return out.sorted { $0.time < $1.time }
+    }
+
+    // Enhanced-LRC word stamp `<mm:ss.xx>`, placed before the word it times.
+    nonisolated(unsafe) private static let wordStampRegex = /<(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?>/
+
+    /// Split a line's text into its words' timings when it carries Enhanced-LRC
+    /// `<mm:ss.xx>` stamps. Returns the plain text (stamps stripped) and the words;
+    /// no stamps → the text as is and no words. A trailing stamp with no word after
+    /// it (an end-of-line marker) is dropped.
+    private static func words(in raw: String) -> (text: String, words: [LyricWord]) {
+        let stamps = raw.matches(of: wordStampRegex)
+        guard !stamps.isEmpty else { return (raw.trimmingCharacters(in: .whitespaces), []) }
+        var words: [LyricWord] = []
+        for (i, stamp) in stamps.enumerated() {
+            let end = i + 1 < stamps.count ? stamps[i + 1].range.lowerBound : raw.endIndex
+            let word = raw[stamp.range.upperBound..<end].trimmingCharacters(in: .whitespaces)
+            if !word.isEmpty { words.append(LyricWord(time: seconds(stamp.1, stamp.2, stamp.3), text: word)) }
+        }
+        return (words.map(\.text).joined(separator: " "), words)
+    }
+
+    /// Seconds for an `mm`, `ss` and optional fraction captured from a stamp.
+    private static func seconds(_ minutes: Substring, _ seconds: Substring, _ fraction: Substring?) -> TimeInterval {
+        let frac = fraction.map { frac -> Double in
+            // "5" → .5, "05" → .05, "050" → .050
+            (Double(frac) ?? 0) / pow(10, Double(frac.count))
+        } ?? 0
+        return (Double(minutes) ?? 0) * 60 + (Double(seconds) ?? 0) + frac
     }
 
     /// Index of the line active at `time` (the last line whose stamp has passed),
