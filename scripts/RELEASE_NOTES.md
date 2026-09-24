@@ -22,6 +22,8 @@ Sonar — a native macOS Winamp-style music player. **Beta build.**
   ♥ favorites filter, then Manual / Recent / A–Z / Artist.
 - **Two-column layout whenever it fits**, not only in fullscreen.
 - **Menu-bar icon** has a right-click Show / Quit menu.
+- **Darker app icon** — the equalizer bars now sit on a near-black tile with
+  a light bevel.
 - **Fixes**
   - Seeking with a trackpad flick commits the moment your fingers lift,
     instead of waiting 2–3 s for the momentum to die out.
