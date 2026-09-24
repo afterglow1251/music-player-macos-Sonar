@@ -1,25 +1,33 @@
 Sonar — a native macOS Winamp-style music player. **Beta build.**
 
-## What's new in 0.3.0
+## What's new in 0.5.0
 
-- **YouTube downloads work again.** YouTube started turning away anonymous
-  requests with *"Sign in to confirm you're not a bot"*, which broke every
-  download. Sonar now falls back to the cookies of a browser you're already
-  signed into, exactly as `yt-dlp` recommends.
-- **It picks the browser for you.** Rather than guessing, Sonar checks which
-  browser actually holds a signed-in YouTube session and uses the one you've
-  used most recently. Chrome, Edge, Brave, Vivaldi, Opera and Firefox are all
-  understood.
-  - Chromium-based browsers encrypt their cookies, so macOS will ask once for
-    permission to read the key — that's the Keychain prompt you'll see. Firefox
-    needs no prompt at all.
-  - The first attempt is always anonymous, so this only kicks in when YouTube
-    insists.
-- **Clearer failures.** Download errors now say what went wrong — rate
-  limiting, an age-restricted video, a missing tool — instead of pasting
-  `yt-dlp`'s raw output into the corner of the window.
-- **Missing `ffmpeg` is caught up front**, rather than halfway through a
-  download that was never going to finish.
+- **Karaoke lyrics.** The active lyric line now fills in word by word as it's
+  sung (Enhanced LRC). Plain line-synced lyrics still light the whole line.
+- **Word-by-word sync through ElevenLabs.** Paste an ElevenLabs API key in
+  Settings (kept in the Keychain) and the lyrics panel can turn line-synced
+  lyrics into karaoke — or, if a song has no lyrics anywhere, transcribe it
+  and time every word from scratch.
+  - A **Words / Letters** switch lights either whole words or each letter at
+    its real sung time.
+  - Long tracks (over 15 minutes) ask first and show the cost; a sync can be
+    cancelled at any point, and multi-hour files no longer eat memory.
+- **Lyrics for mixes.** In a chaptered file (a DJ set, a compilation) each
+  chapter gets its own lyrics, swapped as playback crosses into it and
+  prefetched just before.
+- **Add lyrics by hand.** When the lookup finds nothing — or the wrong song —
+  paste a link (raw .lrc, an LRCLIB record, any lyrics page) or pick a file.
+  Found lyrics get a hover-only *"Wrong lyrics?"* to replace them.
+- **New library view picker.** The view icon slides out a strip on hover:
+  ♥ favorites filter, then Manual / Recent / A–Z / Artist.
+- **Two-column layout whenever it fits**, not only in fullscreen.
+- **Menu-bar icon** has a right-click Show / Quit menu.
+- **Fixes**
+  - Seeking with a trackpad flick commits the moment your fingers lift,
+    instead of waiting 2–3 s for the momentum to die out.
+  - The seek bar's hover label shows just the time and stays over the bar.
+  - Text fields no longer jump on focus, and ⌘A in a text field selects its
+    text instead of every track.
 
 ## Install
 
