@@ -1,8 +1,8 @@
 import AppKit
 
-/// Draws the app's Dock icon at runtime — a black squircle holding a waveform
-/// of rounded equalizer bars, each washed with a green→magenta vertical
-/// gradient. The black tone is sampled to match the reference icon.
+/// Draws the app's Dock icon at runtime — a black squircle holding three
+/// concentric sonar rings, washed diagonally green→grey→magenta. The same mark
+/// as the landing page's. The black tone is sampled to match the reference icon.
 ///
 /// A bare SwiftPM binary has no bundle/AppIcon asset, so we set this image on
 /// `NSApp.applicationIconImage` at launch instead.
@@ -39,59 +39,47 @@ enum AppIcon {
                                    endCenter: hlC, endRadius: rect.width * 0.40, options: [])
             ctx.restoreGState()
 
-            // Equalizer waveform. Each bar is a rounded (stadium) column with an
-            // independent top/bottom expressed as a fraction of the icon height
-            // (0 = bottom edge, 1 = top edge; 0.5 = middle). The tallest column
-            // sits just left of centre, with the deepest magenta reach below it.
-            let bars: [(top: CGFloat, bottom: CGFloat)] = [
-                (0.62, 0.38),
-                (0.74, 0.27),
-                (0.83, 0.15),
-                (0.72, 0.28),
-                (0.60, 0.40),
-            ]
+            // Sonar rings: three concentric circles, like a ping spreading out —
+            // the name, drawn. One diagonal wash runs across all three (bright
+            // green top-left, dusky grey through the middle, vivid magenta
+            // bottom-right), so each ring shifts colour around its circumference.
+            // Proportions match the landing page's mark (radii 19 / 13 / 7 and a
+            // 3 stroke on a 64-point tile), leaving the tile some air around them.
+            let unit = rect.width / 64
+            let rings: [CGFloat] = [19, 13, 7]
+            let lineWidth = 3 * unit
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            let ringsPath = CGMutablePath()
+            for r in rings {
+                ringsPath.addEllipse(in: CGRect(x: center.x - r * unit, y: center.y - r * unit,
+                                                width: 2 * r * unit, height: 2 * r * unit))
+            }
+            let stroked = ringsPath.copy(strokingWithWidth: lineWidth, lineCap: .round,
+                                         lineJoin: .round, miterLimit: 10)
 
-            let barW = rect.width * 0.05
-            let pitch = barW * 2                       // bar + equal gap
-            let groupW = pitch * CGFloat(bars.count) - (pitch - barW)
-            var x = rect.midX - groupW / 2
-
-            // Gradient reused for every bar, mapped to that bar's own extent:
-            // bright green at the cap, dusky grey through the middle, vivid
-            // magenta at the foot.
             let grad = CGGradient(colorsSpace: rgb,
                                   colors: [NSColor(red: 0.40, green: 0.86, blue: 0.44, alpha: 1).cgColor,
                                            NSColor(red: 0.60, green: 0.62, blue: 0.64, alpha: 1).cgColor,
                                            NSColor(red: 0.83, green: 0.16, blue: 0.74, alpha: 1).cgColor] as CFArray,
                                   locations: [0, 0.5, 1])!
+            let outer = rings[0] * unit + lineWidth / 2
 
-            for bar in bars {
-                let top = rect.minY + rect.height * bar.top
-                let bottom = rect.minY + rect.height * bar.bottom
-                let barRect = CGRect(x: x, y: bottom, width: barW, height: top - bottom)
-                let path = CGPath(roundedRect: barRect,
-                                  cornerWidth: barW / 2, cornerHeight: barW / 2,
-                                  transform: nil)
+            // Soft glow beneath the rings.
+            ctx.saveGState()
+            ctx.setShadow(offset: .zero, blur: rect.width * 0.03,
+                          color: NSColor(red: 0.55, green: 0.35, blue: 0.7, alpha: 0.55).cgColor)
+            ctx.addPath(stroked)
+            ctx.setFillColor(NSColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1).cgColor)
+            ctx.fillPath()
+            ctx.restoreGState()
 
-                // Soft glow beneath the column.
-                ctx.saveGState()
-                ctx.setShadow(offset: .zero, blur: rect.width * 0.02,
-                              color: NSColor(red: 0.55, green: 0.35, blue: 0.7, alpha: 0.55).cgColor)
-                ctx.addPath(path)
-                ctx.setFillColor(NSColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1).cgColor)
-                ctx.fillPath()
-                ctx.restoreGState()
-
-                // Green→magenta wash clipped to the column.
-                ctx.saveGState()
-                ctx.addPath(path); ctx.clip()
-                ctx.drawLinearGradient(grad,
-                                       start: CGPoint(x: 0, y: top),
-                                       end: CGPoint(x: 0, y: bottom), options: [])
-                ctx.restoreGState()
-
-                x += pitch
-            }
+            // Green→magenta wash clipped to the rings.
+            ctx.saveGState()
+            ctx.addPath(stroked); ctx.clip()
+            ctx.drawLinearGradient(grad,
+                                   start: CGPoint(x: center.x - outer, y: center.y + outer),
+                                   end: CGPoint(x: center.x + outer, y: center.y - outer), options: [])
+            ctx.restoreGState()
 
             return true
         }
