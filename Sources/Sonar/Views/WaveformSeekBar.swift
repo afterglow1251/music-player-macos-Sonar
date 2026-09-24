@@ -38,6 +38,9 @@ struct WaveformSeekBar: View {
     /// Debounces scroll-driven seeks; see `ScrollSeekDebounce`.
     @State private var scrollSeek = ScrollSeekDebounce()
 
+    /// The hover tooltip's measured width, used to keep it inside the bar.
+    @State private var tooltipWidth: CGFloat = 0
+
     var body: some View {
         GeometryReader { geo in
             let width = geo.size.width
@@ -87,8 +90,21 @@ struct WaveformSeekBar: View {
             .overlay {
                 if let x = seekHoverX, duration > 0 {
                     let frac = min(max(x / width, 0), 1)
-                    TooltipLabel(text: hoverLabel(at: frac * duration))
-                        .position(x: min(max(x, 24), width - 24), y: -18)
+                    // Just the time — the song/chapter name is already in the
+                    // title line. Centred on the cursor, but clamped by the label's
+                    // measured half-width so near either end it slides inward
+                    // instead of spilling past the bar.
+                    let half = min(tooltipWidth, width) / 2
+                    TooltipLabel(text: clockTimeString(frac * duration))
+                        .background(GeometryReader { proxy in
+                            Color.clear
+                                .onAppear { tooltipWidth = proxy.size.width }
+                                .onChange(of: proxy.size.width) { _, w in tooltipWidth = w }
+                        })
+                        // Hidden until measured, so the first frame can't flash
+                        // at an unclamped spot.
+                        .opacity(tooltipWidth > 0 ? 1 : 0)
+                        .position(x: min(max(x, half), width - half), y: -18)
                         .allowsHitTesting(false)
                 }
             }
@@ -173,12 +189,6 @@ struct WaveformSeekBar: View {
         return (CGFloat(start / duration) * width, CGFloat(end / duration) * width)
     }
 
-    /// The section covering `time`, if the track has chapters — the last one that
-    /// has started by then.
-    private func chapter(at time: TimeInterval) -> Chapter? {
-        chapters.last { $0.start <= time + 0.001 }
-    }
-
     /// The seek time for a press at horizontal position `x`, magnetized to a
     /// chapter boundary within a comfortable pixel radius — so aiming at a divider
     /// (or landing a touch either side) lands exactly on that section. Pixel-based,
@@ -197,16 +207,6 @@ struct WaveformSeekBar: View {
             }
         }
         return nearest?.start ?? raw
-    }
-
-    /// The hover tooltip's text: the time, prefixed with the section name when the
-    /// track is chaptered so a mix reads "Song — 12:04" as you scan it.
-    private func hoverLabel(at time: TimeInterval) -> String {
-        let clock = clockTimeString(time)
-        if let title = chapter(at: time)?.title, !title.isEmpty {
-            return "\(title)  ·  \(clock)"
-        }
-        return clock
     }
 
     /// Reduce `peaks` to exactly `count` columns by taking the max over each
