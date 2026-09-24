@@ -366,11 +366,14 @@ final class MenuBarController {
 
     private lazy var contextMenu: NSMenu = {
         let menu = NSMenu()
-        let show = NSMenuItem(title: "Show Sonar", action: #selector(MenuActions.showMainWindow), keyEquivalent: "")
+        let show = NSMenuItem(title: "Show", action: #selector(MenuActions.showMainWindow), keyEquivalent: "")
         show.target = MenuActions.shared
+        // macOS 26 gives Quit a symbol automatically; give Show one too so the two
+        // titles line up instead of Show sitting further left.
+        show.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil)
         menu.addItem(show)
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "Quit Sonar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quit = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp
         menu.addItem(quit)
         return menu
