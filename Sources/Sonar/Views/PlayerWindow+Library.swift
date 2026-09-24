@@ -238,12 +238,12 @@ extension PlayerWindow {
         HStack(spacing: 8) {
             if renamingPlaylist && renameTargetID == playlist.id {
                 SteadyTextField(placeholder: "Playlist name", text: $renameText,
-                                font: .system(size: 11, weight: .semibold),
+                                font: .systemFont(ofSize: 11, weight: .semibold),
                                 textColor: .white,
                                 onSubmit: { commitRename() },
+                                onCancel: { cancelRename() },
                                 focus: $renameFieldFocused)
                     .frame(maxWidth: 180)
-                    .onExitCommand { cancelRename() }
                     .onChange(of: renameFieldFocused) { _, focused in
                         if !focused { commitRename() }   // commit when clicked away
                     }

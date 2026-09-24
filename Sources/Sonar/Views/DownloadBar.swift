@@ -22,7 +22,7 @@ struct DownloadBar: View {
     @Binding var shakingChipURL: String?
     /// The URL field's focus, owned by `PlayerWindow` where it gates the global
     /// shortcuts. Forwarded into `SteadyTextField`.
-    var urlFieldFocused: FocusState<Bool>.Binding
+    var urlFieldFocused: Binding<Bool>
 
     /// Accent — the signature green, used sparingly.
     private let accent = Theme.accent

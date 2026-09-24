@@ -64,9 +64,9 @@ struct PlayerWindow: View {
     /// Decoded once per track (not per frame) so the breathing animation doesn't
     /// re-decode the artwork 30×/sec.
     @State var artworkImage: NSImage?
-    @FocusState var urlFieldFocused: Bool
-    @FocusState var searchFieldFocused: Bool
-    @FocusState var renameFieldFocused: Bool
+    @State var urlFieldFocused = false
+    @State var searchFieldFocused = false
+    @State var renameFieldFocused = false
     /// Some text field is being typed in (any `SteadyTextField`, via
     /// `TextInputFocusKey`) — the bare-key shortcuts stand down so keys edit text.
     @State var isTypingInField = false

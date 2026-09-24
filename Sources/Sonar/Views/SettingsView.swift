@@ -65,7 +65,7 @@ struct SettingsView: View {
                 }
                 HStack(spacing: 3) {
                     SteadyTextField(placeholder: "min", text: $customMinutes,
-                                    font: .system(size: 10), onSubmit: applyCustom)
+                                    font: .systemFont(ofSize: 10), onSubmit: applyCustom)
                         .frame(width: 30)
                     Button(action: applyCustom) {
                         Image(systemName: "arrow.right.circle.fill").font(.system(size: 12))
