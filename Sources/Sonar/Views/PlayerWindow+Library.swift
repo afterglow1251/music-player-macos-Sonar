@@ -67,7 +67,7 @@ extension PlayerWindow {
                     .foregroundStyle(.white.opacity(0.3))
                 Spacer()
                 if !controller.library.tracks.isEmpty {
-                    viewMenu
+                    LibraryViewStrip(view: viewBinding, favoritesOnly: favoritesBinding)
                 }
                 Button { controller.library.revealInFinder() } label: {
                     Image(systemName: "folder").font(.system(size: 12, weight: .medium))
@@ -365,39 +365,7 @@ extension PlayerWindow {
 
     // MARK: Sort & group
 
-    /// Header menu: pick the library browse order (Recent / A–Z / Artist). The
-    /// button shows the active view's icon; each option carries its own icon.
-    private var viewMenu: some View {
-        Menu {
-            // Favorites is a filter, orthogonal to the sort below — you can view
-            // favorites only while still sorting them A–Z, by artist, etc.
-            Toggle(isOn: favoritesBinding) {
-                Label("Favorites", systemImage: "heart")
-            }
-            Divider()
-            Picker("View", selection: viewBinding) {
-                ForEach(LibraryView.allCases, id: \.self) { view in
-                    Label(view.label, systemImage: view.symbol).tag(view)
-                }
-            }
-            .pickerStyle(.inline)
-            .labelsHidden()
-        } label: {
-            Image(systemName: controller.favorites.filterActive ? "heart.fill" : controller.library.view.symbol)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(controller.favorites.filterActive ? Theme.favorite : .white.opacity(0.6))
-                .frame(width: 22, height: 22).contentShape(Rectangle())
-        }
-        // Render the menu as a button so it can take PressableButtonStyle and grow
-        // on hover like the folder/search icons beside it (.onHover doesn't fire
-        // through a borderless menu).
-        .menuStyle(.button)
-        .buttonStyle(PressableButtonStyle())
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .tooltip("View")
-    }
-
+    /// The browse order the header's `LibraryViewStrip` picks.
     private var viewBinding: Binding<LibraryView> {
         // No withAnimation here: animating a full reorder of the (lazy) list makes
         // SwiftUI compute transitions for every row, which for a large library
