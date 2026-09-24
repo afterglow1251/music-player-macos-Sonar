@@ -13,6 +13,12 @@ struct SettingsView: View {
     @State private var customMinutes = ""
     @State private var hoveredTheme: Int?
     @State private var hoveredAlbum = false
+    @ObservedObject private var elevenLabs = ElevenLabsKey.shared
+    /// The key being pasted — shown only while entering one (none saved yet, or
+    /// replacing), never read back from the Keychain.
+    @State private var keyDraft = ""
+    @State private var replacingKey = false
+    @State private var keyError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -26,6 +32,7 @@ struct SettingsView: View {
                     sleepSection
                     themeSection
                     storageSection
+                    elevenLabsSection
                 }
                 .padding(5)   // room for hover-scaled buttons
             }
@@ -177,6 +184,64 @@ struct SettingsView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.6))
             }
+        }
+    }
+
+    // MARK: ElevenLabs
+
+    /// The API key behind "Sync words". Once saved it shows only masked
+    /// ("sk_890f••••••••3155") — enough to tell which key it is, useless if seen.
+    private var elevenLabsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionTitle("ELEVENLABS · WORD-BY-WORD LYRICS")
+            if let masked = elevenLabs.masked, !replacingKey {
+                HStack(spacing: 14) {
+                    Text(masked)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.5))
+                    Button("Replace") { replacingKey = true }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(accent)
+                    Button("Remove") { elevenLabs.remove() }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            } else {
+                HStack(spacing: 10) {
+                    SteadyTextField(placeholder: "Paste your API key", text: $keyDraft,
+                                    font: .monospacedSystemFont(ofSize: 10, weight: .regular), onSubmit: saveKey)
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.08)))
+                    Button("Save", action: saveKey)
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(keyDraft.trimmingCharacters(in: .whitespaces).isEmpty
+                                         ? .white.opacity(0.3) : accent)
+                        .disabled(keyDraft.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if replacingKey {
+                        Button("Cancel") { replacingKey = false; keyDraft = "" }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                }
+                Text(keyError ?? "Needs Forced Alignment + Speech to Text access · ≈ $0.01 per song")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.white.opacity(0.35))
+            }
+        }
+    }
+
+    private func saveKey() {
+        do {
+            try elevenLabs.save(keyDraft)
+            keyDraft = ""
+            replacingKey = false
+            keyError = nil
+        } catch {
+            keyError = error.localizedDescription
         }
     }
 

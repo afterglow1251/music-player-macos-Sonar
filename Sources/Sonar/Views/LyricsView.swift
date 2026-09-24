@@ -26,6 +26,11 @@ struct LyricsView: View {
     /// Pointer over the panel — reveals the "Wrong lyrics?" link, so found lyrics
     /// carry no resting chrome.
     @State private var isHovering = false
+    /// The saved ElevenLabs key (masked) — whether "Sync words" is on offer.
+    @ObservedObject private var elevenLabs = ElevenLabsKey.shared
+    @State private var isSyncing = false
+    /// Why the last word sync failed, shown until the next attempt or song.
+    @State private var syncError: String?
 
     private var activeIndex: Int? {
         controller.lyrics.activeIndex(at: clock.currentTime)
@@ -40,7 +45,10 @@ struct LyricsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onHover { isHovering = $0 }
         // A new song starts with its own lyrics, not the previous one's form.
-        .onChange(of: controller.currentTrack?.url) { _, _ in isReplacing = false }
+        .onChange(of: controller.currentTrack?.url) { _, _ in
+            isReplacing = false
+            syncError = nil
+        }
     }
 
     @ViewBuilder
@@ -53,9 +61,22 @@ struct LyricsView: View {
         case .unavailable:
             // The lookup goes by the song's name, which can miss — let the user
             // point at the right lyrics instead: paste a link, or pick a file.
-            VStack(spacing: 14) {
-                status("No synced lyrics found")
-                importForm
+            if isSyncing {
+                status(spinner: true, "Syncing words…")
+            } else {
+                VStack(spacing: 14) {
+                    status("No synced lyrics found")
+                    // ElevenLabs can time the words itself — from LRCLIB's plain
+                    // lyrics when there are some, else by listening.
+                    if elevenLabs.isSet {
+                        Button("Sync with ElevenLabs", action: syncWords)
+                            .buttonStyle(.plain)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(accent)
+                    }
+                    if let syncError { note(syncError) }
+                    importForm
+                }
             }
         case .loaded:
             // Identity tied to the loaded lyrics themselves (each fetch makes fresh
@@ -81,17 +102,35 @@ struct LyricsView: View {
                 scroller
                     .id(controller.lyrics.lines.first?.id)
                     .overlay(alignment: .bottom) {
-                        if isHovering {
-                            Button("Wrong lyrics?") { isReplacing = true }
-                                .buttonStyle(.plain)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.7))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(Capsule().fill(Color.black.opacity(0.55)))
-                                .padding(.bottom, 10)
-                                .transition(.opacity)
+                        HStack(spacing: 8) {
+                            if isSyncing {
+                                // Stays up while it runs — it takes a few seconds.
+                                pill {
+                                    HStack(spacing: 6) {
+                                        ProgressView().controlSize(.mini).tint(.white.opacity(0.7))
+                                        Text("Syncing words…")
+                                    }
+                                }
+                            } else if let syncError {
+                                pill { Text(syncError) }
+                            } else if isHovering {
+                                // Line-synced lyrics can be upgraded to karaoke — and karaoke
+                                // re-timed (a bad pass, or one from before letter timing),
+                                // overwriting the song's LRC.
+                                if elevenLabs.isSet {
+                                    pill {
+                                        Button(controller.lyrics.hasWordTimings ? "Re-sync" : "Sync words",
+                                               action: syncWords)
+                                            .buttonStyle(.plain)
+                                    }
+                                }
+                                // Letters needs real letter timing — no picker without it.
+                                if controller.lyrics.hasLetterTimings { fillPicker }
+                                pill { Button("Wrong lyrics?") { isReplacing = true }.buttonStyle(.plain) }
+                            }
                         }
+                        .padding(.bottom, 10)
+                        .transition(.opacity)
                     }
                     .animation(.easeOut(duration: 0.15), value: isHovering)
             }
@@ -116,15 +155,58 @@ struct LyricsView: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.white.opacity(0.45))
                 .disabled(isImporting)
-            if let importError {
-                Text(importError)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.45))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-            }
+            if let importError { note(importError) }
         }
         .onDisappear { importError = nil; lyricsLink = "" }
+    }
+
+    /// A small dark capsule floated over the lyrics (actions, sync status).
+    private func pill<Label: View>(@ViewBuilder _ label: () -> Label) -> some View {
+        label()
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.7))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(Color.black.opacity(0.55)))
+    }
+
+    /// Words ⇄ Letters for the karaoke fill — the unselected one dimmed, like the
+    /// app's other two-way toggles, rather than a boxed segmented control.
+    private var fillPicker: some View {
+        pill {
+            HStack(spacing: 8) {
+                ForEach(KaraokeFill.allCases, id: \.self) { mode in
+                    Button(mode.label) { controller.lyrics.fill = mode }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(controller.lyrics.fill == mode ? accent : .white.opacity(0.45))
+                }
+            }
+        }
+    }
+
+    private func note(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11))
+            .foregroundStyle(.white.opacity(0.45))
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 24)
+    }
+
+    /// Time the playing song word by word through ElevenLabs (see
+    /// `LyricsController.syncWords`).
+    private func syncWords() {
+        guard !isSyncing else { return }
+        isSyncing = true
+        syncError = nil
+        let time = clock.currentTime
+        Task {
+            do {
+                try await controller.lyrics.syncWords(at: time)
+            } catch {
+                syncError = error.localizedDescription
+            }
+            isSyncing = false
+        }
     }
 
     private var scroller: some View {
@@ -171,8 +253,10 @@ struct LyricsView: View {
     }
 
     /// The line's text, coloured. Karaoke on the active line of an Enhanced LRC:
-    /// words already sung fill in accent, the rest wait in white. A plain
-    /// line-synced LRC lights the whole active line at once; inactive lines dim.
+    /// sung words are accent, upcoming ones white. In `.letters` mode each letter
+    /// lights at its real sung time (ElevenLabs per-letter timing, when the song
+    /// has it); in `.words` mode a word lights whole the moment it starts. A plain line-synced LRC lights the whole
+    /// active line at once; inactive lines dim.
     private func lineText(_ line: LyricLine, active: Bool) -> Text {
         guard !line.text.isEmpty else {
             return Text("♪").foregroundStyle(active ? accent : .white.opacity(0.4))
@@ -180,11 +264,20 @@ struct LyricsView: View {
         guard active else { return Text(line.text).foregroundStyle(.white.opacity(0.4)) }
         guard !line.words.isEmpty else { return Text(line.text).foregroundStyle(accent) }
         let now = clock.currentTime
-        return line.words.enumerated().reduce(Text("")) { text, item in
-            let (i, word) = item
-            let sung = word.time <= now
-            return text + Text(i == 0 ? word.text : " " + word.text)
-                .foregroundStyle(sung ? accent : .white.opacity(0.85))
+        let words = line.words
+        let upcoming = Color.white.opacity(0.85)
+        return words.indices.reduce(Text("")) { text, i in
+            let word = words[i]
+            let spaced = i == 0 ? word.text : " " + word.text
+            guard word.time <= now else { return text + Text(spaced).foregroundStyle(upcoming) }
+            // Letters: each letter lights when it's actually sung (ElevenLabs
+            // timing). No letter data, or Words mode → the word lights whole.
+            guard controller.lyrics.fill == .letters, !word.letters.isEmpty
+            else { return text + Text(spaced).foregroundStyle(accent) }
+            let letters = Array(word.text)
+            let lit = word.letters.prefix { $0 <= now }.count
+            return text + Text((i == 0 ? "" : " ") + String(letters[..<lit])).foregroundStyle(accent)
+                + Text(String(letters[lit...])).foregroundStyle(upcoming)
         }
     }
 

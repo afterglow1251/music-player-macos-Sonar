@@ -20,6 +20,10 @@ final class LyricsController: ObservableObject {
 
     @Published private(set) var state: State = .idle
     @Published private(set) var lines: [LyricLine] = []
+    /// Karaoke granularity, remembered across launches.
+    @Published var fill: KaraokeFill = Preferences().karaokeFill {
+        didSet { Preferences().karaokeFill = fill }
+    }
 
     private var track: Track?
     private var loadTask: Task<Void, Never>?
@@ -101,6 +105,33 @@ final class LyricsController: ObservableObject {
         guard let track else { return }
         let subject = Self.subject(for: track, at: time)
         show(try await LyricsProvider.importLink(link, for: subject), for: subject)
+    }
+
+    /// Whether the lyrics on screen already carry per-word timing (karaoke).
+    var hasWordTimings: Bool { lines.contains { !$0.words.isEmpty } }
+    /// …and real per-letter timing too — what the Letters fill needs.
+    var hasLetterTimings: Bool { lines.contains { $0.words.contains { !$0.letters.isEmpty } } }
+
+    /// Time the song playing at `time` word by word through ElevenLabs and show the
+    /// result. Uses the best text there is: the lyrics already on screen (their
+    /// line times are kept as a fallback), else LRCLIB's plain lyrics, else none —
+    /// ElevenLabs then transcribes the song itself. Throws
+    /// `ElevenLabsSync.Failure` or a cache-write error.
+    func syncWords(at time: TimeInterval) async throws {
+        guard let track else { return }
+        let subject = Self.subject(for: track, at: time)
+        var source: [ElevenLabsSync.SourceLine]
+        if loaded == subject, state == .loaded, !lines.isEmpty {
+            source = lines.map { .init(text: $0.text, time: $0.time - subject.offset) }
+        } else if let plain = await LyricsProvider.fetchPlainText(for: subject) {
+            source = plain.split(separator: "\n", omittingEmptySubsequences: false).map {
+                .init(text: $0.trimmingCharacters(in: .whitespaces), time: nil)
+            }
+        } else {
+            source = []
+        }
+        let timed = try await ElevenLabsSync.timedLyrics(for: subject, lines: source)
+        show(try LyricsProvider.install(timed.lrc, for: subject, letters: timed.letters), for: subject)
     }
 
     /// Put freshly imported lines on screen — unless playback moved on to another

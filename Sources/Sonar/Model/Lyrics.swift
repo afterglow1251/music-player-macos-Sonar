@@ -15,6 +15,10 @@ struct LyricLine: Identifiable, Hashable {
 struct LyricWord: Hashable {
     let time: TimeInterval
     let text: String
+    /// When each of `text`'s characters is sung — real per-letter timing from
+    /// ElevenLabs, kept beside the LRC (which can only hold word times). Empty
+    /// when there's none; one entry per `Character` of `text` otherwise.
+    var letters: [TimeInterval] = []
 }
 
 /// The song a lyrics lookup is about. Usually the whole file, but for a chaptered
@@ -89,9 +93,16 @@ enum LyricsProvider {
 
     /// Network lookup (LRCLIB) for a cache miss; caches the result on a hit.
     static func fetchRemote(for subject: LyricsSubject) async -> [LyricLine]? {
-        guard let lines = await fetchFromLRCLIB(subject) else { return nil }
-        writeCache(lines.raw, for: subject)
-        return shifted(lines.parsed, by: subject.offset)
+        guard let raw = await fetchFromLRCLIB(subject, .synced) else { return nil }
+        writeCache(raw, for: subject)
+        return shifted(parse(raw), by: subject.offset)
+    }
+
+    /// The song's words from LRCLIB even when nobody has timed them — its plain
+    /// lyrics (or the text of its synced ones). What ElevenLabs aligns against when
+    /// there's no synced LRC to start from. Same matching as the synced lookup.
+    static func fetchPlainText(for subject: LyricsSubject) async -> String? {
+        await fetchFromLRCLIB(subject, .plain)
     }
 
     enum ImportError: LocalizedError {
@@ -175,14 +186,44 @@ enum LyricsProvider {
     /// loads exactly like a downloaded lyric (instantly, offline) and the song
     /// never hits the name lookup again. Rejects text with no timestamps rather
     /// than caching lyrics that could never highlight.
-    private static func install(_ text: String, for subject: LyricsSubject) throws -> [LyricLine] {
-        let lines = parse(text)
+    ///
+    /// `letters` — per-letter times for every word-stamped word, in order — are
+    /// saved beside it; without them any old letter file is removed, so it can
+    /// never be paired with different lyrics.
+    static func install(_ text: String, for subject: LyricsSubject,
+                        letters: [[TimeInterval]]? = nil) throws -> [LyricLine] {
+        var lines = parse(text)
         guard !lines.isEmpty else { throw ImportError.notSynced }
         let url = cacheURL(for: subject)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
         try text.write(to: url, atomically: true, encoding: .utf8)
+        if let letters, let data = try? JSONEncoder().encode(letters) {
+            try data.write(to: lettersURL(for: subject), options: .atomic)
+            lines = attaching(letters, to: lines)
+        } else {
+            try? FileManager.default.removeItem(at: lettersURL(for: subject))
+        }
         return shifted(lines, by: subject.offset)
+    }
+
+    /// Hand each word its letter times, in reading order. All-or-nothing: if the
+    /// counts don't line up word for word (the LRC was edited since), none are
+    /// attached rather than mis-timed ones.
+    private static func attaching(_ letters: [[TimeInterval]], to lines: [LyricLine]) -> [LyricLine] {
+        let words = lines.flatMap(\.words)
+        guard words.count == letters.count,
+              zip(words, letters).allSatisfy({ $0.text.count == $1.count }) else { return lines }
+        var next = letters.makeIterator()
+        return lines.map { line in
+            var line = line
+            line.words = line.words.map { word in
+                var word = word
+                word.letters = next.next() ?? []
+                return word
+            }
+            return line
+        }
     }
 
     /// Move every timestamp later by `offset` — an LRC counts from the song's own
@@ -190,7 +231,9 @@ enum LyricsProvider {
     private static func shifted(_ lines: [LyricLine], by offset: TimeInterval) -> [LyricLine] {
         offset == 0 ? lines : lines.map { line in
             LyricLine(time: line.time + offset, text: line.text,
-                      words: line.words.map { LyricWord(time: $0.time + offset, text: $0.text) })
+                      words: line.words.map {
+                          LyricWord(time: $0.time + offset, text: $0.text, letters: $0.letters.map { $0 + offset })
+                      })
         }
     }
 
@@ -213,11 +256,19 @@ enum LyricsProvider {
             .appendingPathExtension("lrc")
     }
 
+    /// The per-letter timing file beside a song's LRC (`….lrc.letters`, JSON).
+    private static func lettersURL(for subject: LyricsSubject) -> URL {
+        cacheURL(for: subject).appendingPathExtension("letters")
+    }
+
     private static func loadCache(for subject: LyricsSubject) -> [LyricLine]? {
         guard let text = try? String(contentsOf: cacheURL(for: subject), encoding: .utf8)
         else { return nil }
         let lines = parse(text)
-        return lines.isEmpty ? nil : lines
+        guard !lines.isEmpty else { return nil }
+        guard let data = try? Data(contentsOf: lettersURL(for: subject)),
+              let letters = try? JSONDecoder().decode([[TimeInterval]].self, from: data) else { return lines }
+        return attaching(letters, to: lines)
     }
 
     private static func writeCache(_ raw: String, for subject: LyricsSubject) {
@@ -226,11 +277,34 @@ enum LyricsProvider {
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                   withIntermediateDirectories: true)
         try? raw.write(to: url, atomically: true, encoding: .utf8)
+        try? FileManager.default.removeItem(at: lettersURL(for: subject))
     }
 
     // MARK: LRCLIB
 
-    private static func fetchFromLRCLIB(_ subject: LyricsSubject) async -> (raw: String, parsed: [LyricLine])? {
+    /// Which of an LRCLIB record's texts a lookup is after.
+    private enum LRCLIBField {
+        case synced   // the timed LRC
+        case plain    // just the words — for alignment
+
+        /// The record's usable text of this kind, or nil. A synced LRC must parse
+        /// to at least one line; plain text falls back to a synced LRC's words.
+        func text(of record: LRCLIBRecord) -> String? {
+            switch self {
+            case .synced:
+                guard let lrc = record.syncedLyrics, !parse(lrc).isEmpty else { return nil }
+                return lrc
+            case .plain:
+                if let plain = record.plainLyrics,
+                   !plain.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return plain }
+                guard let lrc = record.syncedLyrics else { return nil }
+                let lines = parse(lrc).map(\.text)
+                return lines.contains(where: { !$0.isEmpty }) ? lines.joined(separator: "\n") : nil
+            }
+        }
+    }
+
+    private static func fetchFromLRCLIB(_ subject: LyricsSubject, _ field: LRCLIBField) async -> String? {
         let lookups = lookups(for: subject)
         guard !lookups.isEmpty else { return nil }
 
@@ -240,7 +314,8 @@ enum LyricsProvider {
         for lk in lookups {
             for artist in lk.artists {
                 if let hit = await lrclibGetExact(artist: artist, title: lk.title,
-                                                  duration: subject.strictDuration ? subject.duration : 0) {
+                                                  duration: subject.strictDuration ? subject.duration : 0,
+                                                  field) {
                     return hit
                 }
             }
@@ -248,7 +323,7 @@ enum LyricsProvider {
         // 2. Fuzzy search fallback for messy names, but only ACCEPT a result that
         //    verifiably matches this song. Better no lyrics than someone else's.
         for lk in lookups {
-            if let hit = await lrclibSearch(lk, subject: subject) { return hit }
+            if let hit = await lrclibSearch(lk, subject: subject, field) { return hit }
         }
         return nil
     }
@@ -256,8 +331,8 @@ enum LyricsProvider {
     /// Exact lookup by artist + title. Tries with the duration first (LRCLIB's most
     /// precise match), then without it, so a track whose length differs slightly from
     /// LRCLIB's copy still resolves. Exact on artist+title, so it never mis-matches.
-    private static func lrclibGetExact(artist: String, title: String,
-                                       duration: TimeInterval) async -> (raw: String, parsed: [LyricLine])? {
+    private static func lrclibGetExact(artist: String, title: String, duration: TimeInterval,
+                                       _ field: LRCLIBField) async -> String? {
         for includeDuration in [true, false] where !(includeDuration && duration <= 0) {
             guard var components = URLComponents(string: "https://lrclib.net/api/get") else { continue }
             var items = [
@@ -270,9 +345,8 @@ enum LyricsProvider {
             components.queryItems = items
             guard let url = components.url,
                   let payload: LRCLIBRecord = await get(url),
-                  let synced = payload.syncedLyrics, !synced.isEmpty else { continue }
-            let parsed = parse(synced)
-            if !parsed.isEmpty { return (synced, parsed) }
+                  let text = field.text(of: payload) else { continue }
+            return text
         }
         return nil
     }
@@ -287,7 +361,8 @@ enum LyricsProvider {
     ///      highest-recall option for collab names however they're joined server-side.
     ///   2. Free-text `q=` with a separator-normalized artist + title — a broader net.
     ///   3. Title alone, but only when we have no artist at all (the gate guards it).
-    private static func lrclibSearch(_ lk: Lookup, subject: LyricsSubject) async -> (raw: String, parsed: [LyricLine])? {
+    private static func lrclibSearch(_ lk: Lookup, subject: LyricsSubject,
+                                     _ field: LRCLIBField) async -> String? {
         var queries: [SearchQuery] = []
         for artist in lk.artists {
             queries.append(SearchQuery(track: lk.title, artist: normalizeArtist(artist)))
@@ -302,7 +377,7 @@ enum LyricsProvider {
         for query in queries where seen.insert(query).inserted {
             guard let results = await runSearch(query) else { continue }
             let candidates = results.filter {
-                !($0.syncedLyrics ?? "").isEmpty
+                field.text(of: $0) != nil
                     && isConfidentMatch(title: $0.trackName ?? "", artist: $0.artistName ?? "",
                                         duration: $0.duration, subject: subject)
             }
@@ -311,10 +386,7 @@ enum LyricsProvider {
                 ? candidates.min { abs(($0.duration ?? .greatestFiniteMagnitude) - subject.duration)
                                  < abs(($1.duration ?? .greatestFiniteMagnitude) - subject.duration) }!
                 : candidates[0]
-            if let raw = best.syncedLyrics {
-                let parsed = parse(raw)
-                if !parsed.isEmpty { return (raw, parsed) }
-            }
+            if let text = field.text(of: best) { return text }
         }
         return nil
     }

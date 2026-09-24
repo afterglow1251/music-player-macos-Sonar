@@ -27,6 +27,19 @@ enum LibraryView: String, CaseIterable {
     }
 }
 
+/// How the karaoke fill moves across the line being sung.
+enum KaraokeFill: String, CaseIterable {
+    case words    // each word lights up whole as it starts
+    case letters  // the word being sung fills in letter by letter
+
+    var label: String {
+        switch self {
+        case .words:   return "Words"
+        case .letters: return "Letters"
+        }
+    }
+}
+
 /// Typed wrapper over `UserDefaults`. One place owns every key **and** its type,
 /// so a read and a write can never disagree, and a mistyped key is a compile
 /// error rather than a silent runtime bug.
@@ -41,6 +54,7 @@ final class Preferences {
         case libraryOrder, librarySort, playlists
         case favorites, favoritesFilter
         case folderScopedStateMigrated
+        case karaokeFill
     }
 
     // MARK: Folder-scoped state
@@ -169,6 +183,11 @@ final class Preferences {
     var musicFolderBookmark: Data? {
         get { defaults.data(forKey: Key.musicFolderBookmark.rawValue) }
         set { defaults.set(newValue, forKey: Key.musicFolderBookmark.rawValue) }
+    }
+
+    var karaokeFill: KaraokeFill {
+        get { defaults.string(forKey: Key.karaokeFill.rawValue).flatMap(KaraokeFill.init) ?? .letters }
+        set { defaults.set(newValue.rawValue, forKey: Key.karaokeFill.rawValue) }
     }
 
     var volume: Float? {
