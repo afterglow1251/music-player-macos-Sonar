@@ -15,8 +15,11 @@ final class ElevenLabsKey: ObservableObject {
     nonisolated private static let service = "com.afterglow.sonar.elevenlabs"
     nonisolated private static let account = "api-key"
 
+    /// Only the item's *label* is read here — the masked form, stored beside the
+    /// key. Reading the key itself makes macOS ask for Keychain access, so doing
+    /// that at every launch just to show the masked key meant a prompt every start.
     private init() {
-        masked = Self.read().map(Self.mask)
+        masked = Self.savedLabel()
     }
 
     var isSet: Bool { masked != nil }
@@ -28,6 +31,7 @@ final class ElevenLabsKey: ObservableObject {
         SecItemDelete(Self.query as CFDictionary)
         var item = Self.query
         item[kSecValueData as String] = data
+        item[kSecAttrLabel as String] = Self.mask(key)
         let status = SecItemAdd(item as CFDictionary, nil)
         guard status == errSecSuccess else { throw KeychainError(status: status) }
         masked = Self.mask(key)
@@ -47,6 +51,18 @@ final class ElevenLabsKey: ObservableObject {
         guard SecItemCopyMatching(lookup as CFDictionary, &result) == errSecSuccess,
               let data = result as? Data else { return nil }
         return String(data: data, encoding: .utf8)
+    }
+
+    /// The saved item's label (the masked key), read without touching the secret.
+    nonisolated private static func savedLabel() -> String? {
+        var lookup = query
+        lookup[kSecReturnAttributes as String] = true
+        lookup[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(lookup as CFDictionary, &result) == errSecSuccess,
+              let attributes = result as? [String: Any] else { return nil }
+        // An item saved before the label existed still counts as a saved key.
+        return attributes[kSecAttrLabel as String] as? String ?? String(repeating: "•", count: 8)
     }
 
     nonisolated private static var query: [String: Any] {

@@ -53,8 +53,20 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# Ad-hoc code signature so Gatekeeper lets it run locally.
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+# Code signature. A dev build is signed with the local Apple Development
+# certificate when there is one: that identity stays the same from build to
+# build, so the Keychain keeps honouring "Always Allow" for Sonar's saved API
+# key. An ad-hoc signature changes with every build, which to the Keychain is a
+# different app each time — it asked again after every rebuild. Release builds
+# (a version passed in) stay ad-hoc, as before.
+IDENTITY="-"
+if [ $# -eq 0 ]; then
+    DEV_ID="$(security find-identity -v -p codesigning 2>/dev/null \
+        | sed -n 's/.*"\(Apple Development: [^"]*\)".*/\1/p' | head -1)"
+    [ -n "$DEV_ID" ] && IDENTITY="$DEV_ID"
+fi
+codesign --force --deep --sign "$IDENTITY" "$APP" >/dev/null 2>&1 \
+    || codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
 
 echo "✓ Built $APP"
 echo "  Move it to Applications:  cp -R $APP /Applications/"
