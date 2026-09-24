@@ -37,6 +37,9 @@ struct WindowWidthSnapper: NSViewRepresentable {
             DispatchQueue.main.async {
                 guard !window.styleMask.contains(.fullScreen),
                       let content = window.contentView else { return }
+                // A frame big enough for the two-column layout is kept as is —
+                // it fills that width rather than leaving margins.
+                guard !PlayerWindow.fitsWideLayout(content.frame.size) else { return }
                 let fit = content.fittingSize.width
                 guard fit > 100, fit < content.frame.width else { return }
                 window.setContentSize(NSSize(width: fit, height: content.frame.height))

@@ -10,6 +10,9 @@ struct PlayerWindow: View {
     /// while the window can't be seen — fully covered, minimized, other Space.
     @StateObject var windowOcclusion = WindowOcclusionMonitor()
     @State var isFullscreen = false
+    /// The (non-fullscreen) window is big enough for the two-column layout —
+    /// e.g. zoomed to fill the screen — so it gets the same spread as fullscreen.
+    @State var isWideWindow = false
     @State var fsLeftHeight: CGFloat = 400   // measured left-column height (fullscreen)
     @State var scrollToCurrentNonce = 0      // bump to scroll the list to the current track
     @State var jumpGeneration = 0            // invalidates a pending "jump to current track" when the source changes
@@ -73,14 +76,35 @@ struct PlayerWindow: View {
 
     var engine: AudioEngine { controller.engine }
 
+    /// Two columns (now-playing | library) instead of the single stacked one:
+    /// always in fullscreen, and in a window whenever both columns fit.
+    var usesWideLayout: Bool { isFullscreen || isWideWindow }
+
+    /// The smallest window content size the two-column layout fits in without
+    /// cramping: the minimum cover + gap + minimum library width, and a cover
+    /// tall enough to still read as the hero next to the controls below it.
+    static let wideLayoutMinSize = CGSize(width: 880, height: 760)
+
+    static func fitsWideLayout(_ size: CGSize) -> Bool {
+        size.width >= wideLayoutMinSize.width && size.height >= wideLayoutMinSize.height
+    }
+
     var body: some View {
         Group {
-            if isFullscreen {
+            if usesWideLayout {
                 fullscreenContent
             } else {
                 normalContent
             }
         }
+        // Fill the window (the single column stays centred in it) so the reader
+        // below measures the window's content area, not the fixed-width column.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(GeometryReader { proxy in
+            Color.clear
+                .onAppear { isWideWindow = Self.fitsWideLayout(proxy.size) }
+                .onChange(of: proxy.size) { _, size in isWideWindow = Self.fitsWideLayout(size) }
+        })
         // Enable the native green fullscreen button / ⌃⌘F, and track its state so
         // we can swap in the immersive visualizer when the window goes fullscreen.
         .background(FullscreenEnabler())
@@ -153,6 +177,11 @@ struct PlayerWindow: View {
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.willExitFullScreenNotification)) { _ in
             isFullscreen = false
         }
+        // Remember playback position on quit (in addition to pause/track-change).
+        // On the body, not a layout, so it's registered whichever layout is showing.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            controller.saveOnQuit()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { note in
             // Once windowed again, snap the frame to the fixed-width content's natural
             // size so there are no leftover black margins around it. `normalContent`
@@ -160,7 +189,9 @@ struct PlayerWindow: View {
             // fittingSize is already correct — no settling delay needed.
             guard let window = note.object as? NSWindow else { return }
             Task { @MainActor in
-                if let content = window.contentView {
+                // A window restored to a two-column size keeps it — there are no
+                // margins to trim there.
+                if let content = window.contentView, !Self.fitsWideLayout(content.frame.size) {
                     let fit = content.fittingSize
                     if fit.width > 100, fit.height > 100 { window.setContentSize(fit) }
                 }
@@ -218,10 +249,6 @@ struct PlayerWindow: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleSettings)) { _ in
             withAnimation(.easeInOut(duration: 0.22)) { showSettings.toggle() }
-        }
-        // Remember playback position on quit (in addition to pause/track-change).
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-            controller.saveOnQuit()
         }
         // Keyboard model (active only while no text field is focused, so fields
         // keep their own keys): ↑/↓ walk the track-list cursor and ↩ plays it;

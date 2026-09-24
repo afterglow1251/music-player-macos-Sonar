@@ -5,15 +5,23 @@ import UniformTypeIdentifiers
 extension PlayerWindow {
     // MARK: Fullscreen (the whole player, spread across the big screen)
 
-    /// Fullscreen reuses every normal control — nothing is lost. It just lays the
-    /// player out in two columns (now-playing on the left, library/queue on the
-    /// right) over a blurred-artwork backdrop, with a larger visualizer.
+    /// Fullscreen (and a window big enough for it — see `usesWideLayout`)
+    /// reuses every normal control — nothing is lost. It just lays the player
+    /// out in two columns (now-playing on the left, library/queue on the right)
+    /// over a blurred-artwork backdrop, with a larger visualizer.
     var fullscreenContent: some View {
         GeometryReader { geo in
             // Scale the cover and the list to the actual screen so it truly fills,
             // and center the two columns so there's no top-left void.
-            let artSize = min(max(geo.size.height * 0.5, 340), 660)
+            //
+            // The cover is also capped by what's left once the controls under it
+            // (~460pt) and the library column beside it are accounted for, so a
+            // window just past `wideLayoutMinSize` shrinks the cover instead of
+            // pushing the column off the bottom or the library off the side.
             let rightWidth = min(max(geo.size.width * 0.30, 420), 780)
+            let artFit = min(geo.size.height * 0.5, geo.size.height - 460,
+                             geo.size.width - rightWidth - 60 - 64)
+            let artSize = min(max(artFit, 300), 660)
             ZStack {
                 fullscreenBackdrop
                 HStack(alignment: .top, spacing: 60) {
