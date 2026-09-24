@@ -124,9 +124,15 @@ final class MenuBarController {
         // apps, so without this a click on our own window never closed the panel.
         pressMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self else { return event }
-            if let button = self.statusItem.button, event.type == .leftMouseDown,
-               event.window === button.window, !event.modifierFlags.contains(.command) {
-                self.togglePanel(nil)
+            if let button = self.statusItem.button, event.window === button.window,
+               !event.modifierFlags.contains(.command) {
+                // Right-click (or Ctrl-click, the one-button equivalent) opens the
+                // app menu — Show / Quit — like other menu-bar extras.
+                if event.type == .rightMouseDown || event.modifierFlags.contains(.control) {
+                    self.showContextMenu()
+                } else {
+                    self.togglePanel(nil)
+                }
                 return nil
             }
             if self.isPanelOpen, event.window !== self.panel {
@@ -354,6 +360,39 @@ final class MenuBarController {
             NSEvent.removeMonitor(monitor)
             clickMonitor = nil
         }
+    }
+
+    // MARK: Context menu
+
+    private lazy var contextMenu: NSMenu = {
+        let menu = NSMenu()
+        let show = NSMenuItem(title: "Show Sonar", action: #selector(MenuActions.showMainWindow), keyEquivalent: "")
+        show.target = MenuActions.shared
+        menu.addItem(show)
+        menu.addItem(.separator())
+        let quit = NSMenuItem(title: "Quit Sonar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.target = NSApp
+        menu.addItem(quit)
+        return menu
+    }()
+
+    /// Pops the Show / Quit menu under the status button. Attaching the menu only
+    /// for the duration of `performClick` gets the native placement and button
+    /// highlight, while left-clicks keep opening the panel (a permanently
+    /// attached `statusItem.menu` would hijack every click).
+    private func showContextMenu() {
+        if isPanelOpen { dismiss() }
+        statusItem.menu = contextMenu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    /// Objective-C targets for the context menu — `MenuBarController` isn't an
+    /// `NSObject`, so it can't receive selector-based menu actions itself.
+    @MainActor
+    private final class MenuActions: NSObject {
+        static let shared = MenuActions()
+        @objc func showMainWindow() { MenuBarController.showMainWindow() }
     }
 
     private func dismiss() {
