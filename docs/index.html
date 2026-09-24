@@ -4,335 +4,388 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sonar — a music player for macOS</title>
-<meta name="description" content="Sonar is a native macOS music player with a real-time visualizer, letter-by-letter karaoke and YouTube downloads.">
+<meta name="description" content="Sonar is a native macOS music player with a real-time visualizer, letter-by-letter karaoke timed by ElevenLabs, and YouTube downloads.">
 <meta property="og:title" content="Sonar — a music player for macOS">
 <meta property="og:description" content="A real-time visualizer, letter-by-letter karaoke and YouTube downloads, in one native Mac app.">
-<meta name="theme-color" content="#08090b">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317171a'/%3E%3Cg fill='none' stroke-width='3'%3E%3Ccircle cx='32' cy='32' r='19' stroke='%23d429bd'/%3E%3Ccircle cx='32' cy='32' r='13' stroke='%239a9ea3'/%3E%3Ccircle cx='32' cy='32' r='7' stroke='%2366db70'/%3E%3C/g%3E%3C/svg%3E">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='t' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231c1c1e'/%3E%3Cstop offset='1' stop-color='%23060607'/%3E%3C/linearGradient%3E%3ClinearGradient id='r' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.32'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='.06'/%3E%3C/linearGradient%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2366db70'/%3E%3Cstop offset='.5' stop-color='%23999ea3'/%3E%3Cstop offset='1' stop-color='%23d429bd'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url%28%23t%29'/%3E%3Crect x='.75' y='.75' width='62.5' height='62.5' rx='13.3' fill='none' stroke='url%28%23r%29' stroke-width='1.5'/%3E%3Cg fill='url%28%23g%29'%3E%3Crect x='17.6' y='24.32' width='3.2' height='15.36' rx='1.6'/%3E%3Crect x='24.0' y='16.64' width='3.2' height='30.08' rx='1.6'/%3E%3Crect x='30.4' y='10.88' width='3.2' height='43.52' rx='1.6'/%3E%3Crect x='36.8' y='17.92' width='3.2' height='28.16' rx='1.6'/%3E%3Crect x='43.2' y='25.60' width='3.2' height='12.80' rx='1.6'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #08090b;
-    --bg-2: #0e1013;
-    --panel: #121418;
-    --line: rgba(255,255,255,.08);
-    --text: #eef0f2;
-    --muted: #9aa0a8;
-    --dim: #5d636b;
+    --bg: #000;
+    --panel: #0a0a0a;
+    --panel-2: #111;
+    --line: rgba(255,255,255,.1);
+    --line-strong: rgba(255,255,255,.16);
+    --text: #ededed;
+    --muted: #a1a1a1;
+    --dim: #6b6b6b;
     --accent: #4ade6b;
-    --accent-deep: #1f8a3a;
     --magenta: #d429bd;
     --pink: #ff5a73;
-    --radius: 18px;
-    --display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-    --body: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
-    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --radius: 14px;
+    --wrap: 1120px;
+    --sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font: 16px/1.6 var(--body);
-    -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
-  }
+  body { background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
   a { color: inherit; text-decoration: none; }
-  .wrap { width: min(1180px, 100% - 32px); margin-inline: auto; }
-  .mono { font-family: var(--mono); }
-  .eyebrow {
-    font: 700 11px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
-    color: var(--accent);
-  }
-
-  /* ── ambient glow behind everything ─────────────────────────── */
-  .aurora {
-    position: fixed; inset: -20vh -10vw auto; height: 90vh; z-index: -1; pointer-events: none;
-    background:
-      radial-gradient(40% 50% at 25% 30%, rgba(74,222,107,.16), transparent 70%),
-      radial-gradient(35% 45% at 78% 22%, rgba(212,41,189,.16), transparent 70%),
-      radial-gradient(30% 40% at 55% 70%, rgba(56,120,255,.08), transparent 70%);
-    filter: blur(20px);
-    animation: drift 18s ease-in-out infinite alternate;
-  }
-  @keyframes drift { to { transform: translate3d(0, 4vh, 0) scale(1.08); } }
+  .wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 24px; }
 
   /* ── nav ─────────────────────────────────────────────────────── */
-  nav {
-    position: sticky; top: 0; z-index: 20;
-    backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
-    background: rgba(8,9,11,.55); border-bottom: 1px solid var(--line);
-  }
-  nav .wrap { display: flex; align-items: center; gap: 28px; height: 64px; }
-  .brand { display: flex; align-items: center; gap: 10px; font: 700 19px var(--display); letter-spacing: -.01em; }
-  .brand svg { width: 30px; height: 30px; }
-  nav .links { display: flex; gap: 24px; margin-left: auto; font-size: 14px; color: var(--muted); }
+  nav { position: sticky; top: 0; z-index: 30; backdrop-filter: blur(14px) saturate(1.5); -webkit-backdrop-filter: blur(14px) saturate(1.5);
+    background: rgba(0,0,0,.6); border-bottom: 1px solid var(--line); }
+  nav .wrap { height: 64px; display: flex; align-items: center; gap: 28px; }
+  .brand { display: flex; align-items: center; gap: 10px; font: 600 17px var(--sans); letter-spacing: -.02em; }
+  .brand svg { width: 26px; height: 26px; }
+  nav .links { display: flex; gap: 24px; margin-left: 8px; font-size: 14px; color: var(--muted); }
+  nav .links a { transition: color .2s; }
   nav .links a:hover { color: var(--text); }
-  .btn {
-    display: inline-flex; align-items: center; gap: 10px;
-    font: 600 15px var(--body); border-radius: 999px; padding: 12px 22px;
-    transition: transform .2s cubic-bezier(.2,.8,.2,1.4), box-shadow .2s, background .2s;
-    white-space: nowrap;
-  }
-  .btn:hover { transform: translateY(-2px) scale(1.02); }
+  nav .right-bt { margin-left: auto; display: flex; gap: 8px; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: 500 14px var(--sans); border-radius: 999px; padding: 0 18px; height: 40px;
+    transition: background .2s, box-shadow .2s, transform .2s cubic-bezier(.2,.8,.2,1.4); white-space: nowrap; }
   .btn:active { transform: scale(.97); }
-  .btn-primary {
-    background: var(--accent); color: #04130a;
-    box-shadow: 0 10px 40px -10px rgba(74,222,107,.7), inset 0 1px 0 rgba(255,255,255,.35);
-  }
-  .btn-primary:hover { box-shadow: 0 16px 50px -10px rgba(74,222,107,.9), inset 0 1px 0 rgba(255,255,255,.35); }
-  .btn-ghost { background: rgba(255,255,255,.06); border: 1px solid var(--line); }
-  .btn-ghost:hover { background: rgba(255,255,255,.1); }
-  nav .btn { padding: 9px 16px; font-size: 13px; }
+  .btn-primary { background: var(--text); color: #000; }
+  .btn-primary:hover { background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,.12); }
+  .btn-ghost { background: #0a0a0a; border: 1px solid var(--line-strong); color: var(--text); }
+  .btn-ghost:hover { background: #1a1a1a; }
+  .btn svg { width: 15px; height: 15px; }
+  .btn.lg { height: 48px; padding: 0 24px; font-size: 15px; }
+  nav .btn { height: 34px; padding: 0 14px; font-size: 13.5px; }
+
+  /* ── type ────────────────────────────────────────────────────── */
+  h1, h2, h3 { font-family: var(--sans); letter-spacing: -.04em; }
+  h1 { font-size: clamp(46px, 7.4vw, 88px); line-height: .98; font-weight: 700; }
+  h2 { font-size: clamp(34px, 4.6vw, 56px); line-height: 1.02; font-weight: 700; }
+  .lit { background: linear-gradient(92deg, var(--accent), #c5ef6a 45%, var(--magenta)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .eyebrow { font: 500 14px var(--sans); color: var(--muted); margin-bottom: 16px; letter-spacing: 0; }
+  .sec { padding: 140px 0 0; }
+  .sec-head { text-align: center; max-width: 720px; margin: 0 auto 56px; }
+  .sec-head p { font-size: 18px; color: var(--muted); margin-top: 18px; line-height: 1.55; }
+  .sec-head p b { color: var(--text); font-weight: 500; }
+  .reveal { opacity: 0; transform: translateY(20px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,.8,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
 
   /* ── hero ────────────────────────────────────────────────────── */
-  .hero { padding: 96px 0 40px; text-align: center; }
-  .hero .eyebrow { display: inline-flex; gap: 10px; align-items: center; padding: 8px 14px; border-radius: 999px;
-    background: rgba(74,222,107,.08); border: 1px solid rgba(74,222,107,.25); }
-  .hero .eyebrow i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: blink 1.6s infinite; }
-  @keyframes blink { 50% { opacity: .3; } }
-  h1 {
-    font: 700 clamp(46px, 8.4vw, 104px)/.95 var(--display); letter-spacing: -.045em;
-    margin: 0 auto 22px; max-width: 12ch;
-  }
-  h1 .lit {
-    background: linear-gradient(92deg, var(--accent) 0%, #b7f26b 35%, #f5d547 55%, var(--magenta) 100%);
-    background-size: 200% 100%;
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    animation: sweep 6s ease-in-out infinite alternate;
-  }
-  @keyframes sweep { to { background-position: 100% 0; } }
-  .hero p.lead { font-size: clamp(17px, 2vw, 20px); color: var(--muted); max-width: 620px; margin: 0 auto 36px; }
-  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-  .meta { margin-top: 18px; font: 500 12px var(--mono); color: var(--dim); letter-spacing: .04em; }
+  .hero { position: relative; padding-top: 112px; text-align: center; }
+  .hero::before { content: ""; position: absolute; left: 50%; top: -120px; width: min(1100px, 120vw); height: 720px; transform: translateX(-50%); z-index: -1; pointer-events: none;
+    background: radial-gradient(40% 50% at 35% 40%, rgba(74,222,107,.16), transparent 70%),
+                radial-gradient(38% 48% at 68% 35%, rgba(212,41,189,.16), transparent 70%); filter: blur(20px); }
+  .hero .sub { max-width: 620px; margin: 26px auto 0; font-size: clamp(17px, 1.6vw, 20px); color: var(--muted); line-height: 1.55; }
+  .hero .sub b { color: var(--text); font-weight: 500; }
+  .hero .cta { display: flex; gap: 12px; justify-content: center; margin-top: 36px; flex-wrap: wrap; }
+  .hero .fine { margin-top: 16px; font-size: 13px; color: var(--dim); }
 
-  /* ── the mock player window ─────────────────────────────────── */
-  .stage { position: relative; margin: 72px auto 0; width: min(980px, 100%); perspective: 1600px; }
-  .stage::before {
-    content: ""; position: absolute; inset: 8% 6% -6%; z-index: -1; border-radius: 40px;
-    background: radial-gradient(60% 60% at 30% 40%, rgba(74,222,107,.35), transparent 70%),
-                radial-gradient(50% 60% at 75% 60%, rgba(212,41,189,.35), transparent 70%);
-    filter: blur(60px); opacity: .8;
-  }
-  .window {
-    border-radius: 16px; overflow: hidden; text-align: left;
-    background: linear-gradient(180deg, #16181c, #0b0c0f);
-    border: 1px solid rgba(255,255,255,.1);
-    box-shadow: 0 50px 120px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(0,0,0,.6);
-    transform: rotateX(8deg) translateY(10px);
-    transition: transform .8s cubic-bezier(.2,.8,.2,1);
-  }
-  .stage.in .window { transform: rotateX(0) translateY(0); }
-  .titlebar { height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: rgba(255,255,255,.03); border-bottom: 1px solid var(--line); }
-  .titlebar i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
-  .titlebar i:nth-child(2) { background: #febc2e; }
-  .titlebar i:nth-child(3) { background: #28c840; }
-  .app { position: relative; display: grid; grid-template-columns: 1.05fr 1fr; gap: 28px; padding: 26px; isolation: isolate; }
-  .app::before { /* blurred-cover backdrop, like the real app */
-    content: ""; position: absolute; inset: 0; z-index: -1;
-    background: radial-gradient(50% 60% at 20% 20%, rgba(212,41,189,.28), transparent 70%),
-                radial-gradient(50% 60% at 70% 30%, rgba(56,120,255,.18), transparent 70%),
-                linear-gradient(180deg, rgba(0,0,0,.1), rgba(0,0,0,.55));
-  }
-  .left { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-  .cover {
-    position: relative; aspect-ratio: 1; border-radius: 14px; overflow: hidden;
-    background: #1b0f24;
-    box-shadow: 0 20px 50px -20px rgba(0,0,0,.9);
-    animation: breathe 1.2s ease-in-out infinite;
-  }
+  /* ── the app mock ────────────────────────────────────────────── */
+  .stage { position: relative; margin: 72px auto 0; max-width: 1040px; perspective: 1800px; }
+  .stage::before { content: ""; position: absolute; inset: 8% 6% 2%; z-index: -1; border-radius: 40px;
+    background: radial-gradient(55% 60% at 30% 40%, rgba(74,222,107,.2), transparent 70%),
+                radial-gradient(50% 60% at 75% 60%, rgba(212,41,189,.22), transparent 70%); filter: blur(70px); }
+  .window { border-radius: 14px; overflow: hidden; background: #101014; text-align: left;
+    border: 1px solid var(--line-strong); box-shadow: 0 50px 120px -30px rgba(0,0,0,.95), inset 0 1px 0 rgba(255,255,255,.06);
+    transform: rotateX(8deg) translateY(10px) scale(.98); transition: transform 1s cubic-bezier(.2,.8,.2,1); }
+  .stage.in .window { transform: none; }
+  .titlebar { height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 13px; }
+  .titlebar i { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; }
+  .titlebar i:nth-child(2) { background: #febc2e; } .titlebar i:nth-child(3) { background: #28c840; }
+  .app { position: relative; display: grid; grid-template-columns: 1.05fr 1fr; gap: 24px; padding: 6px 22px 22px; isolation: isolate; }
+  .appbg { position: absolute; inset: 0; z-index: -1; overflow: hidden; }
+  .appbg::before { content: ""; position: absolute; inset: -10%;
+    background: radial-gradient(45% 55% at 22% 25%, rgba(212,41,189,.28), transparent 70%), radial-gradient(45% 55% at 60% 30%, rgba(59,108,255,.2), transparent 70%),
+                radial-gradient(40% 40% at 30% 70%, rgba(74,222,107,.12), transparent 70%); filter: blur(30px); }
+  .appbg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.15), rgba(0,0,0,.62)); }
+  .left { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .cover { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: #1b0f24; animation: breathe 1.2s ease-in-out infinite; }
   @keyframes breathe { 50% { transform: scale(1.012); } }
-  .cover .blob { position: absolute; border-radius: 50%; filter: blur(28px); mix-blend-mode: screen; }
-  .cover .b1 { width: 70%; height: 70%; left: -10%; top: -5%; background: #d429bd; animation: orbit 9s linear infinite; }
-  .cover .b2 { width: 60%; height: 60%; right: -12%; top: 20%; background: #3b6cff; animation: orbit 11s linear infinite reverse; }
-  .cover .b3 { width: 55%; height: 55%; left: 20%; bottom: -18%; background: #4ade6b; animation: orbit 13s linear infinite; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(28px); mix-blend-mode: screen; }
+  .b1 { width: 70%; height: 70%; left: -10%; top: -5%; background: #d429bd; animation: orbit 9s linear infinite; }
+  .b2 { width: 60%; height: 60%; right: -12%; top: 20%; background: #3b6cff; animation: orbit 11s linear infinite reverse; }
+  .b3 { width: 55%; height: 55%; left: 20%; bottom: -18%; background: #4ade6b; animation: orbit 13s linear infinite; }
   @keyframes orbit { from { transform: rotate(0) translateX(8%) rotate(0); } to { transform: rotate(360deg) translateX(8%) rotate(-360deg); } }
-  .cover .grain { position: absolute; inset: 0; opacity: .18; mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E"); }
-  .cover .art-title { position: absolute; left: 22px; bottom: 18px; font: 700 clamp(26px, 4vw, 44px)/.9 var(--display); letter-spacing: -.04em; text-transform: uppercase; }
-  .cover .art-title small { display: block; font: 700 11px var(--mono); letter-spacing: .3em; opacity: .75; margin-bottom: 8px; }
+  .cover .art-title { position: absolute; left: 20px; bottom: 16px; font: 700 clamp(24px, 3.4vw, 40px)/.9 var(--sans); letter-spacing: -.04em; text-transform: uppercase; }
+  .cover .art-title small { display: block; font: 700 10px var(--mono); letter-spacing: .3em; opacity: .75; margin-bottom: 8px; }
   .cover .pills { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; }
-  .cover .pills span { width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.45); display: grid; place-items: center; }
-  .cover .pills svg { width: 14px; height: 14px; }
-  .nowplaying { display: flex; justify-content: space-between; align-items: end; gap: 10px; }
-  .nowplaying .src { font: 600 11px var(--body); color: var(--dim); display: flex; gap: 6px; align-items: center; }
-  .nowplaying .src b { color: var(--muted); font-weight: 600; }
-  .nowplaying .src i { display: inline-flex; gap: 1.5px; align-items: end; height: 9px; }
-  .nowplaying .src i u { width: 2px; background: var(--magenta); animation: eq .7s ease-in-out infinite alternate; text-decoration: none; }
-  .nowplaying .src i u:nth-child(2) { animation-delay: -.3s; }
-  .nowplaying .src i u:nth-child(3) { animation-delay: -.5s; }
-  @keyframes eq { from { height: 2px; } to { height: 9px; } }
-  .nowplaying h4 { font: 700 18px var(--body); margin-top: 3px; }
-  .nowplaying p { font-size: 13px; color: var(--muted); }
-  .nowplaying .time { font: 700 13px var(--mono); color: var(--accent); white-space: nowrap; }
+  .cover .pills span { width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,.45); display: grid; place-items: center; }
+  .cover .pills svg { width: 13px; height: 13px; }
+  .np { display: flex; justify-content: space-between; align-items: end; gap: 10px; }
+  .np .src { font: 600 11px var(--sans); color: var(--dim); display: flex; gap: 6px; align-items: center; }
+  .np .src b { color: var(--muted); font-weight: 600; }
+  .bars { display: inline-flex; gap: 1.5px; align-items: center; height: 10px; }
+  .bars u { width: 2px; height: 5px; border-radius: 2px; background: currentColor; }
+  .bars.live u { animation: eq .7s ease-in-out infinite alternate; }
+  .bars.live u:nth-child(2) { animation-delay: -.3s; } .bars.live u:nth-child(3) { animation-delay: -.5s; }
+  @keyframes eq { from { height: 3px; } to { height: 10px; } }
+  .np h4 { font: 600 17px var(--sans); letter-spacing: -.01em; margin-top: 3px; }
+  .np p { font-size: 13px; color: var(--muted); }
+  .np .time { font: 700 12.5px var(--mono); color: var(--accent); white-space: nowrap; }
   canvas { display: block; width: 100%; }
-  #viz { height: 70px; }
-  #wave { height: 34px; cursor: pointer; }
+  #viz { height: 80px; }
+  .wave { height: 30px; cursor: pointer; }
   .wavewrap { position: relative; }
-  .wavewrap .tip {
-    position: absolute; top: -30px; transform: translateX(-50%); pointer-events: none;
-    font: 600 11px var(--body); background: #292b2f; padding: 4px 8px; border-radius: 6px;
-    box-shadow: 0 6px 16px rgba(0,0,0,.5); opacity: 0; transition: opacity .15s;
-  }
+  .wavewrap .tip { position: absolute; top: -30px; transform: translateX(-50%); pointer-events: none; font: 600 11px var(--sans);
+    background: #292b2f; padding: 4px 8px; border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,.5); opacity: 0; transition: opacity .15s; }
   .wavewrap:hover .tip { opacity: 1; }
-  .transport { display: flex; justify-content: center; align-items: center; gap: 26px; margin-top: 2px; }
-  .transport svg { width: 18px; height: 18px; fill: var(--text); opacity: .9; }
-  .transport .play { width: 50px; height: 50px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; box-shadow: 0 10px 30px -8px rgba(74,222,107,.8); }
-  .transport .play svg { fill: #06170c; width: 20px; height: 20px; }
-  .right { border: 1px solid var(--line); border-radius: 14px; background: rgba(10,11,14,.55); padding: 14px 10px; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
-  .app .right { height: 0; min-height: 100%; }   /* the list follows the left column, never stretches it */
-  .app .rows { overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 85%, transparent); mask-image: linear-gradient(180deg, #000 85%, transparent); }
+  /* the app's transport: shuffle · prev · −10 · play · +10 · next · repeat */
+  .transport { display: flex; justify-content: center; align-items: center; gap: 20px; padding-top: 2px; }
+  .transport svg { width: 18px; height: 18px; color: rgba(255,255,255,.85); }
+  .transport .off { color: rgba(255,255,255,.5); }
+  .transport .play { width: 48px; height: 48px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; box-shadow: 0 0 16px rgba(74,222,107,.5); }
+  .transport .play svg { color: #000; width: 19px; height: 19px; }
+  .lib { border: 1px solid var(--line); border-radius: 14px; background: rgba(10,10,12,.55); padding: 14px 10px; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .app .lib { height: 0; min-height: 100%; }
   .libhead { display: flex; align-items: center; gap: 8px; padding: 0 6px 10px; font: 700 10px var(--mono); color: var(--dim); letter-spacing: .08em; }
   .libhead .n { color: #484d54; }
   .libhead .icons { margin-left: auto; display: flex; gap: 14px; align-items: center; }
   .libhead svg { width: 14px; height: 14px; stroke: #8b9098; }
-  .strip { display: flex; align-items: center; gap: 2px; border-radius: 999px; padding: 0; transition: background .25s, padding .25s; }
+  .strip { display: flex; align-items: center; gap: 2px; border-radius: 999px; transition: background .25s, padding .25s; }
   .strip .opt { width: 0; opacity: 0; transform: scale(.4) translateX(10px); transition: all .34s cubic-bezier(.2,.9,.2,1.25); overflow: hidden; display: grid; place-items: center; height: 22px; }
   .strip.open { background: rgba(255,255,255,.06); padding: 0 4px; }
   .strip.open .opt { width: 22px; opacity: 1; transform: none; }
   .strip .div { width: 0; height: 12px; background: rgba(255,255,255,.15); transition: all .3s; }
   .strip.open .div { width: 1px; margin: 0 3px; }
   .strip .anchor { transition: opacity .2s, width .3s; width: 14px; }
-  .strip.open .anchor { opacity: 0; width: 0; }   /* like the app: the icon becomes the strip */
+  .strip.open .anchor { opacity: 0; width: 0; }
   .strip .opt.on svg { stroke: var(--accent); }
   .strip .opt.fav svg { stroke: var(--pink); }
   .chips { display: flex; gap: 6px; padding: 0 6px 10px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
-  .chip { font: 600 11px var(--body); padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.07); color: var(--muted); }
+  .chip { font: 600 11px var(--sans); padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.07); color: var(--muted); }
   .chip.on { background: var(--accent); color: #06170c; }
   .rows { display: flex; flex-direction: column; gap: 2px; }
+  /* like the app: the list just runs on under the panel's edge, no fade */
+  .app .rows { overflow: hidden; }
   .row { display: grid; grid-template-columns: 18px 1fr auto; gap: 10px; align-items: center; padding: 7px 8px; border-radius: 9px; font-size: 13px; }
   .row b { font-weight: 500; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row small { color: var(--dim); font-size: 11px; }
   .row .d { font: 500 11px var(--mono); color: var(--dim); }
   .row .note { color: #6b7078; font-size: 12px; }
+  .row .note.fav { color: var(--pink); }
   .row.now { background: rgba(74,222,107,.14); }
-  .row.now .note { display: inline-flex; gap: 1.5px; align-items: end; height: 11px; }
-  .row.now .note u { width: 2px; background: var(--accent); animation: eq .6s ease-in-out infinite alternate; }
-  .row.now .note u:nth-child(2) { animation-delay: -.25s; }
-  .row.now .note u:nth-child(3) { animation-delay: -.45s; }
-  .row .fav { color: var(--pink); }
-
-  /* ── sections ────────────────────────────────────────────────── */
-  section { padding: 120px 0; }
-  .sec-head { max-width: 640px; margin-bottom: 56px; }
-  h2 { font: 700 clamp(34px, 5vw, 58px)/1 var(--display); letter-spacing: -.035em; margin: 16px 0 18px; }
-  .sec-head p { color: var(--muted); font-size: 18px; }
-  .reveal { opacity: 0; transform: translateY(28px); transition: opacity .9s ease, transform .9s cubic-bezier(.2,.8,.2,1); }
-  .reveal.in { opacity: 1; transform: none; }
-
-  .split { display: grid; grid-template-columns: 1fr 1.1fr; gap: 64px; align-items: center; }
-  .split.flip { grid-template-columns: 1.1fr 1fr; }
-  .split.flip .copy { order: 2; }
-  .copy ul { list-style: none; display: grid; gap: 14px; margin-top: 28px; }
-  .copy li { display: grid; grid-template-columns: 22px 1fr; gap: 12px; color: var(--muted); }
-  .copy li b { color: var(--text); font-weight: 600; }
-  .copy li::before { content: ""; width: 8px; height: 8px; margin-top: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
-  .card {
-    position: relative; border-radius: var(--radius); background: linear-gradient(180deg, #111317, #0a0b0d);
-    border: 1px solid var(--line); padding: 26px; overflow: hidden;
-  }
-  .card::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
-    background: radial-gradient(60% 50% at 50% 0%, rgba(255,255,255,.06), transparent 70%); }
-
-  /* visualizer showcase */
-  #bigviz { height: 300px; }
-  .modes { display: flex; gap: 6px; margin-top: 18px; }
-  .modes button, .seg button {
-    font: 600 12px var(--body); color: var(--muted); background: rgba(255,255,255,.05);
-    border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer; transition: all .2s;
-  }
-  .modes button:hover, .seg button:hover { color: var(--text); }
-  .modes button.on, .seg button.on { color: #06170c; background: var(--accent); border-color: var(--accent); }
-  .themes { display: flex; gap: 8px; margin-left: auto; }
-  .themes i { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform .2s; }
-  .themes i:hover { transform: scale(1.15); }
-  .themes i.on { border-color: #fff; }
-
-  /* karaoke showcase */
-  .karaoke { min-height: 360px; display: flex; flex-direction: column; justify-content: center; }
-  .klines { display: grid; gap: 14px; font: 600 clamp(20px, 2.6vw, 30px)/1.25 var(--body); letter-spacing: -.01em; }
-  .kline { color: rgba(255,255,255,.28); transition: color .3s, transform .4s cubic-bezier(.2,.8,.2,1), opacity .3s; transform-origin: left center; }
-  .kline.active { color: rgba(255,255,255,.92); transform: scale(1.06); }
-  .kline .lit { color: var(--accent); text-shadow: 0 0 22px rgba(74,222,107,.45); }
-  .kbar { display: flex; align-items: center; gap: 12px; margin-top: 30px; }
-  .seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(0,0,0,.35); border: 1px solid var(--line); }
-  .seg button { border: 0; background: transparent; }
-  .kbar .hint { font: 500 12px var(--mono); color: var(--dim); }
-
-  /* downloads showcase */
-  .dl { display: grid; gap: 14px; }
-  .field {
-    position: relative; display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 999px;
-    background: rgba(255,255,255,.07); overflow: hidden; font-size: 15px;
-  }
-  .field .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(74,222,107,.22); border-radius: inherit; }
-  .field .txt { position: relative; flex: 1; color: var(--muted); white-space: nowrap; overflow: hidden; }
-  .field .txt .caret { display: inline-block; width: 1.5px; height: 1.1em; background: var(--text); vertical-align: -3px; margin-left: 1px; animation: blink 1s steps(1) infinite; }
-  .field .status { position: relative; font: 500 13px var(--body); color: var(--text); opacity: .75; }
-  .field svg { position: relative; width: 22px; height: 22px; flex: none; }
-  .dlchips { display: flex; gap: 8px; min-height: 28px; flex-wrap: wrap; }
-  .dlchip { font: 600 12px var(--body); padding: 5px 12px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--muted);
-    animation: pop .45s cubic-bezier(.2,.9,.2,1.4) both; }
-  @keyframes pop { from { opacity: 0; transform: scale(.6); } }
+  .row.now .note { color: var(--accent); }
   .newrow { animation: slidein .6s cubic-bezier(.2,.8,.2,1) both; }
   @keyframes slidein { from { opacity: 0; transform: translateY(-8px); background: rgba(74,222,107,.3); } }
 
-  /* grid of smaller features */
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .feat { padding: 26px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); transition: transform .3s cubic-bezier(.2,.8,.2,1), border-color .3s; }
-  .feat:hover { transform: translateY(-4px); border-color: rgba(74,222,107,.35); }
-  .feat .ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: rgba(74,222,107,.1); margin-bottom: 18px; }
-  .feat .ic svg { width: 20px; height: 20px; stroke: var(--accent); }
-  .feat h3 { font: 600 18px var(--display); margin-bottom: 6px; letter-spacing: -.01em; }
-  .feat p { color: var(--muted); font-size: 14.5px; }
+  /* ── tabbed showcase ─────────────────────────────────────────── */
+  .tabs { display: flex; justify-content: center; margin-bottom: 28px; }
+  .tabs .seg { padding: 4px; }
+  .tabs .seg button { font-size: 14px; padding: 8px 18px; }
+  .showcase { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
+  .pane { display: none; grid-template-columns: .9fr 1.1fr; min-height: 460px; }
+  .pane.on { display: grid; animation: fade .45s ease both; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } }
+  .pane .txt { padding: 48px 44px; display: flex; flex-direction: column; }
+  .pane .txt h3 { font: 600 28px/1.12 var(--sans); letter-spacing: -.035em; margin-bottom: 14px; }
+  .pane .txt p { color: var(--muted); font-size: 15.5px; }
+  .pane .txt ul { list-style: none; margin-top: auto; padding-top: 28px; display: grid; gap: 12px; }
+  .pane .txt li { font-size: 14.5px; color: var(--muted); padding-left: 26px; position: relative; }
+  .pane .txt li::before { content: ""; position: absolute; left: 0; top: 4px; width: 16px; height: 16px; border-radius: 50%;
+    background: rgba(74,222,107,.14) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4.5 8.2 2.3 2.3 4.7-5' fill='none' stroke='%234ade6b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat; }
+  .pane .txt li b { color: var(--text); font-weight: 500; }
+  .pane .demo { margin: 10px; border-radius: 10px; padding: 36px; display: flex; flex-direction: column; justify-content: center; gap: 18px; min-width: 0;
+    background: #000; border: 1px solid var(--line); }
+  #bigviz { height: 280px; }
+  .ctrls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  /* one white thumb slides under the picked option, instead of each button
+     fading its own background in and out (that blinked) */
+  .seg { position: relative; display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: #0a0a0a; border: 1px solid var(--line); isolation: isolate; }
+  .seg .thumb { position: absolute; top: 3px; bottom: 3px; left: 0; z-index: -1; border-radius: 999px; background: var(--text);
+    transition: transform .32s cubic-bezier(.3,.9,.3,1), width .32s cubic-bezier(.3,.9,.3,1); }
+  .seg button { font: 500 12.5px var(--sans); color: var(--muted); background: none; border: 0; border-radius: 999px; padding: 6px 13px; cursor: pointer; transition: color .2s; }
+  .seg button:hover { color: var(--text); }
+  .seg button.on { color: #000; }
+  .themes { display: flex; gap: 8px; margin-left: auto; }
+  /* like the app's Settings swatches: a diagonal wash, a hairline rim, a white ring when picked */
+  .themes i { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
+    transition: transform .2s cubic-bezier(.2,.9,.2,1.4), box-shadow .2s; }
+  .themes i:hover { transform: scale(1.12); }
+  .themes i.on { box-shadow: inset 0 0 0 2px #fff; }
+  .klines { display: grid; gap: 14px; font: 600 clamp(20px, 2.4vw, 28px)/1.25 var(--sans); letter-spacing: -.02em; }
+  .kline { color: rgba(255,255,255,.26); transition: color .3s, transform .4s cubic-bezier(.2,.8,.2,1); transform-origin: left center; }
+  .kline.active { color: rgba(255,255,255,.92); transform: scale(1.05); }
+  .kline .lit { color: var(--accent); text-shadow: 0 0 22px rgba(74,222,107,.45); }
+  .field { position: relative; display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-radius: 999px; background: rgba(255,255,255,.07); overflow: hidden; isolation: isolate; font-size: 14.5px; }
+  .field .fill { position: absolute; inset: 0 auto 0 0; width: 0; z-index: -1; background: rgba(74,222,107,.22); border-radius: inherit; }
+  .field .ftxt { position: relative; flex: 1; color: var(--muted); white-space: nowrap; overflow: hidden; }
+  .caret { display: inline-block; width: 1.5px; height: 1.1em; background: var(--text); vertical-align: -3px; margin-left: 1px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .field .status { position: relative; font: 500 13px var(--sans); color: var(--text); opacity: .75; }
+  .field svg { position: relative; width: 21px; height: 21px; flex: none; }
+  .dlchips { display: flex; gap: 8px; min-height: 26px; flex-wrap: wrap; }
+  .dlchip { font: 600 12px var(--sans); padding: 4px 12px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--muted); animation: pop .45s cubic-bezier(.2,.9,.2,1.4) both; }
+  @keyframes pop { from { opacity: 0; transform: scale(.6); } }
 
-  /* install */
-  .install { text-align: center; }
-  .install h2 { margin-inline: auto; max-width: 14ch; }
-  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 48px 0 40px; text-align: left; }
-  .step { padding: 24px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
-  .step .num { font: 700 12px var(--mono); color: var(--accent); }
-  .step h3 { font: 600 17px var(--display); margin: 10px 0 6px; }
+  /* ── ElevenLabs: the app's lyrics panel, playing a remix from nothing to karaoke ── */
+  .ks { display: grid; grid-template-columns: 1.15fr .85fr; gap: 64px; align-items: center; }
+  .kpanel { position: relative; aspect-ratio: 1 / .82; border-radius: 16px; overflow: hidden; background: #120a18; border: 1px solid var(--line);
+    box-shadow: 0 40px 90px -30px rgba(0,0,0,.9); isolation: isolate; }
+  .kpanel .blob { position: absolute; z-index: 0; opacity: .55; filter: blur(50px); }
+  .kpanel::after { content: ""; position: absolute; inset: 0; z-index: 0; background: rgba(0,0,0,.55); }
+  .know, .kst, .cursor { z-index: 1; }
+  .know { position: absolute; left: 18px; top: 16px; right: 18px; display: flex; align-items: center; gap: 10px; }
+  .know .art { width: 34px; height: 34px; border-radius: 7px; flex: none; background: linear-gradient(135deg, #3b6cff, #d429bd 55%, #ff9f43); }
+  .know b { display: block; font: 600 13px var(--sans); }
+  .know small { font-size: 11.5px; color: var(--muted); }
+  .know .t { margin-left: auto; font: 700 11.5px var(--mono); color: var(--accent); }
+  .kst { position: absolute; inset: 60px 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    opacity: 0; pointer-events: none; transition: opacity .45s ease; }
+  .kst.on { opacity: 1; pointer-events: auto; }
+  .kst .msg { font: 500 13px var(--sans); color: rgba(255,255,255,.45); }
+  .kst .go { font: 600 14px var(--sans); color: var(--accent); transition: transform .15s; }
+  .kst .go.press { transform: scale(.92); }
+  .kst .cancel { font: 500 12px var(--sans); color: rgba(255,255,255,.4); }
+  .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.15); border-top-color: rgba(255,255,255,.75); animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .kst .row1 { display: flex; align-items: center; gap: 9px; font: 500 13px var(--sans); color: rgba(255,255,255,.7); }
+  #kst-c { padding: 0 28px 56px; }
+  .klines2 { display: grid; gap: 12px; text-align: center; font: 600 clamp(19px, 2.3vw, 26px)/1.25 var(--sans); letter-spacing: -.02em; }
+  .klines2 .kline { transform-origin: center; }
+  #kst-c.on .kline { animation: linein .6s cubic-bezier(.2,.8,.2,1) both; }
+  #kst-c.on .kline:nth-child(2) { animation-delay: .08s; } #kst-c.on .kline:nth-child(3) { animation-delay: .16s; } #kst-c.on .kline:nth-child(4) { animation-delay: .24s; }
+  @keyframes linein { from { opacity: 0; transform: translateY(14px); } }
+  .kbar { position: absolute; left: 0; right: 0; bottom: 14px; display: flex; justify-content: center; align-items: center; gap: 8px; }
+  .kpill { font: 600 11.5px var(--sans); color: rgba(255,255,255,.7); padding: 5px 11px; border-radius: 999px; background: rgba(0,0,0,.55); }
+  .kbar .seg { background: rgba(0,0,0,.55); border: 0; padding: 2px; }
+  .kbar .seg .thumb { top: 2px; bottom: 2px; }
+  .kbar .seg button { font-size: 11.5px; font-weight: 600; padding: 3px 11px; }
+  .cursor { position: absolute; width: 20px; height: 20px; left: 78%; top: 90%; opacity: 0; pointer-events: none;
+    transition: opacity .25s, transform .12s; filter: drop-shadow(0 2px 4px rgba(0,0,0,.6)); }
+  /* the demo's timeline: one segment per step, fills as it plays; click or drag to scrub */
+  .kscrub { position: relative; display: flex; gap: 6px; align-items: center; height: 22px; margin-top: 14px; cursor: pointer; touch-action: none; user-select: none; }
+  .kscrub i { position: relative; flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,.14); overflow: hidden; transition: height .15s; }
+  .kscrub:hover i, .kscrub.drag i { height: 6px; }
+  .kscrub i b { position: absolute; inset: 0 auto 0 0; width: 0; background: #fff; border-radius: inherit; }
+  .kscrub .knob { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: #fff;
+    box-shadow: 0 0 0 4px rgba(255,255,255,.12), 0 2px 6px rgba(0,0,0,.5); transform: scale(0); transition: transform .15s; pointer-events: none; }
+  .kscrub:hover .knob, .kscrub.drag .knob { transform: scale(1); }
+  .ksteps li { cursor: pointer; }
+  .ksteps li:hover { opacity: .7; } .ksteps li.on:hover { opacity: 1; }
+  .cursor.down { transform: scale(.85); }
+  .ksteps { list-style: none; display: grid; gap: 30px; }
+  .ksteps li { display: grid; grid-template-columns: 30px 1fr; gap: 16px; opacity: .35; transition: opacity .4s; }
+  .ksteps li.on { opacity: 1; }
+  .ksteps .n { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 600 13px var(--mono); background: #1a1a1a; border: 1px solid var(--line-strong); transition: background .4s, color .4s; }
+  .ksteps li.on .n { background: var(--text); color: #000; }
+  .ksteps h3 { font: 600 19px/1.3 var(--sans); letter-spacing: -.025em; padding-top: 3px; }
+  .ksteps p { color: var(--muted); font-size: 14.5px; margin-top: 4px; }
+
+  /* ── bento ───────────────────────────────────────────────────── */
+  .bento { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  /* each card has its own colour (--c): a faint wash in the corner, a tinted icon,
+     and a spotlight that follows the pointer on hover */
+  .card { --c: #4ade6b; --mx: 50%; --my: 0%; position: relative; border-radius: var(--radius); padding: 24px; isolation: isolate;
+    background: var(--panel); border: 1px solid var(--line);
+    display: flex; flex-direction: column; min-height: 210px; overflow: hidden; transition: border-color .15s, transform .15s ease-out; }
+  .card::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0; transition: opacity .15s;
+    background: radial-gradient(360px circle at var(--mx) var(--my), color-mix(in srgb, var(--c) 14%, transparent), transparent 70%); }
+  .card:hover { border-color: color-mix(in srgb, var(--c) 30%, transparent); transform: translateY(-2px); }
+  .card:hover::before { opacity: 1; }
+  /* while a card is still scrolling into view, the slow reveal wins over the snappy hover */
+  .card.reveal:not(.done) { transition: opacity .8s ease, transform .8s cubic-bezier(.2,.8,.2,1); }
+  .card.big { grid-column: span 2; min-height: 340px; }
+  .ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; border: 1px solid var(--line); background: #111;
+    transition: border-color .15s, background .15s, box-shadow .15s; }
+  .ic svg { width: 18px; height: 18px; stroke: var(--text); opacity: .9; transition: stroke .15s; }
+  .card:hover .ic { border-color: color-mix(in srgb, var(--c) 40%, transparent); background: color-mix(in srgb, var(--c) 14%, #0a0a0a);
+    box-shadow: 0 0 22px -6px color-mix(in srgb, var(--c) 55%, transparent); }
+  .card:hover .ic svg { stroke: var(--c); }
+  .card .body { margin-top: auto; padding-top: 22px; }
+  .card h3 { font: 600 17px var(--sans); letter-spacing: -.02em; margin-bottom: 5px; }
+  .card p { color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .card .vis { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 150px; }
+  .wmeta { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; font-size: 13px; transition: opacity .3s; }
+  .wmeta.swap { opacity: 0; }
+  .wmeta b { font-weight: 600; } .wmeta small { color: var(--muted); font-size: 13px; margin-left: 4px; }
+  .wmeta .t { font: 500 12px var(--mono); color: var(--dim); white-space: nowrap; }
+  .menubar { width: 100%; max-width: 420px; }
+  .menubar .mb { height: 26px; border-radius: 7px; background: rgba(255,255,255,.06); display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding: 0 12px; font: 500 11px var(--sans); color: var(--muted); }
+  .menubar .mb .me { background: rgba(255,255,255,.14); border-radius: 5px; padding: 3px 5px; display: grid; place-items: center; }
+  .menubar .mb svg { width: 13px; height: 13px; }
+  .mini { margin: 8px 0 0 auto; width: 250px; border-radius: 14px; background: rgba(30,32,36,.9); border: 1px solid var(--line-strong); padding: 12px;
+    box-shadow: 0 20px 40px -12px rgba(0,0,0,.8); display: grid; gap: 9px; }
+  .mini .top { display: flex; gap: 10px; align-items: center; }
+  .mini .top .show { width: 15px; height: 15px; margin-left: auto; align-self: flex-start; color: var(--muted); flex: none; }
+  .mini .top > div { min-width: 0; }
+  .mini .top b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mtimes { display: flex; justify-content: space-between; margin-top: 3px; font: 500 9.5px var(--mono); color: var(--muted); }
+  .mini .art { width: 44px; height: 44px; border-radius: 7px; background: linear-gradient(135deg, #d429bd, #3b6cff 60%, #4ade6b); flex: none; transition: background .4s; }
+  .mini .top > div { transition: opacity .25s, transform .25s; }
+  .mini .top.swap > div { opacity: 0; transform: translateY(4px); }
+  .mini b { font: 600 12px var(--sans); display: block; }
+  .mini small { font-size: 11px; color: var(--muted); }
+  .mini .wave { height: 20px; }
+  .mini .tr { display: flex; justify-content: center; align-items: center; gap: 26px; }
+  .mini .tr svg { width: 15px; height: 15px; color: var(--text); }
+  .mini .tr svg.pp { width: 20px; height: 20px; }
+
+  /* ── install ─────────────────────────────────────────────────── */
+  /* the last step carries a Terminal command, so it gets the room to show it whole */
+  .steps { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.75fr); gap: 14px; }
+  .step { padding: 26px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+  .step .num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 600 12px var(--mono); color: #000; background: var(--text); }
+  .step h3 { font: 600 18px var(--sans); letter-spacing: -.02em; margin: 20px 0 6px; }
   .step p { color: var(--muted); font-size: 14px; }
-  .step code { font: 500 12.5px var(--mono); background: rgba(255,255,255,.07); padding: 2px 6px; border-radius: 5px; color: var(--text); }
-  .guide { max-width: 760px; margin: 64px auto 0; text-align: left; padding: 30px; border-radius: var(--radius);
-    background: var(--panel); border: 1px solid var(--line); }
-  .guide-head { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 22px; }
-  .guide-ic { flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: rgba(74,222,107,.1); }
-  .guide-ic svg { width: 20px; height: 20px; stroke: var(--accent); }
-  .guide h3 { font: 600 19px var(--display); margin-bottom: 4px; }
-  .guide-head p { color: var(--muted); font-size: 14.5px; }
-  .guide ol { list-style: none; counter-reset: g; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
-  .guide li { counter-increment: g; position: relative; padding-left: 40px; color: var(--muted); font-size: 14.5px; }
+  .step p b { color: var(--text); font-weight: 500; }
+  .step .cmd { margin-top: 14px; }
+  .step .cmd code { background: none; padding: 0; }
+  .step code { font: 500 12.5px var(--mono); background: rgba(255,255,255,.08); padding: 2px 6px; border-radius: 5px; color: var(--text); }
+  .dl-row { display: flex; justify-content: center; margin-top: 32px; }
+  .guides { display: grid; gap: 14px; margin-top: 72px; }
+  .guide { display: grid; grid-template-columns: .8fr 1.2fr; gap: 48px; padding: 36px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--panel); }
+  .guide .gh { display: flex; flex-direction: column; gap: 10px; }
+  .guide h3 { font: 600 24px/1.15 var(--sans); letter-spacing: -.035em; }
+  .guide .gh p { color: var(--muted); font-size: 15px; }
+  .guide .tag { font: 500 13px var(--sans); color: var(--dim); margin-bottom: -4px; }
+  .guide ol { list-style: none; counter-reset: g; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .guide li { counter-increment: g; position: relative; padding-left: 42px; color: var(--muted); font-size: 14.5px; }
   .guide li::before { content: counter(g); position: absolute; left: 0; top: -1px; width: 26px; height: 26px; border-radius: 50%;
-    display: grid; place-items: center; font: 700 12px var(--mono); color: #06170c; background: var(--accent); }
-  .guide li b { color: var(--text); font-weight: 600; }
+    display: grid; place-items: center; font: 600 12px var(--mono); color: var(--text); background: #1a1a1a; border: 1px solid var(--line-strong); }
+  .guide li b { color: var(--text); font-weight: 500; }
   .guide small { display: block; margin-top: 8px; color: var(--dim); font-size: 12.5px; }
-  .guide small a { color: var(--accent); }
-  .cmd { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 10px 10px 14px; border-radius: 10px;
-    background: #07080a; border: 1px solid var(--line); }
+  .guide a.u { color: var(--text); text-decoration: underline; text-decoration-color: var(--dim); text-underline-offset: 3px; }
+  .guide a.u:hover { text-decoration-color: var(--text); }
+  .cmd { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 6px 6px 6px 14px; border-radius: 10px; background: #000; border: 1px solid var(--line); }
   .cmd code { flex: 1; min-width: 0; font: 500 12.5px var(--mono); color: var(--text); overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
-  .copy { flex: none; font: 600 12px var(--body); color: var(--text); background: rgba(255,255,255,.08); border: 1px solid var(--line);
-    border-radius: 7px; padding: 6px 12px; cursor: pointer; transition: all .2s; }
-  .copy:hover { background: rgba(255,255,255,.14); }
-  .copy.done { background: var(--accent); color: #06170c; border-color: var(--accent); }
+  /* copy: just an icon; it turns into a check for a moment once copied */
+  .copybtn { flex: none; width: 30px; height: 30px; display: grid; place-items: center; background: none; border: 0; border-radius: 7px;
+    color: var(--muted); cursor: pointer; transition: background .2s, color .2s; }
+  .copybtn:hover { background: rgba(255,255,255,.08); color: var(--text); }
+  .copybtn svg { width: 15px; height: 15px; grid-area: 1 / 1; transition: opacity .2s, transform .25s cubic-bezier(.2,.9,.2,1.4); }
+  .copybtn .i-ok { opacity: 0; transform: scale(.5); color: var(--accent); }
+  .copybtn.done .i-copy { opacity: 0; transform: scale(.5); }
+  .copybtn.done .i-ok { opacity: 1; transform: none; }
 
-  footer { border-top: 1px solid var(--line); padding: 36px 0 60px; color: var(--dim); font-size: 13px; }
-  footer .wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  /* ── closing call ────────────────────────────────────────────── */
+  .final { position: relative; text-align: center; padding: 160px 0 150px; }
+  .final::before { content: ""; position: absolute; left: 50%; top: 40%; width: min(900px, 110vw); height: 420px; transform: translate(-50%, -50%); z-index: -1;
+    background: radial-gradient(40% 50% at 40% 50%, rgba(74,222,107,.12), transparent 70%), radial-gradient(40% 50% at 62% 50%, rgba(212,41,189,.12), transparent 70%); filter: blur(20px); }
+  .final svg.rings { width: 64px; height: 64px; margin-bottom: 28px; }
+  .final .cta { display: flex; gap: 12px; justify-content: center; margin-top: 32px; flex-wrap: wrap; }
+
+  footer { border-top: 1px solid var(--line); }
+  footer .wrap { padding-top: 28px; padding-bottom: 44px; display: flex; align-items: center; gap: 20px; color: var(--dim); font-size: 13px; }
   footer .links { margin-left: auto; display: flex; gap: 20px; }
+  footer a { transition: color .2s; }
   footer a:hover { color: var(--text); }
 
   @media (max-width: 900px) {
-    .app { grid-template-columns: 1fr; }
-    .right { display: none; }
-    .split, .split.flip { grid-template-columns: 1fr; gap: 36px; }
-    .split.flip .copy { order: 0; }
-    .grid, .steps { grid-template-columns: 1fr; }
+    .sec { padding-top: 96px; }
+    .hero { padding-top: 72px; }
+    .app { grid-template-columns: 1fr; } .app .lib { display: none; }
+    .pane.on { grid-template-columns: 1fr; }
+    .pane .txt { padding: 28px; }
+    .pane .demo { padding: 22px; }
+    .ks { grid-template-columns: 1fr; gap: 36px; }
+    .bento { grid-template-columns: 1fr; } .card.big { grid-column: auto; }
+    .steps { grid-template-columns: 1fr; }
+    .guide { grid-template-columns: 1fr; gap: 24px; padding: 24px; }
     nav .links { display: none; }
-    section { padding: 80px 0; }
-    #bigviz { height: 220px; }
+    nav .btn-ghost { display: none; }
+    #bigviz { height: 200px; }
+    .transport { gap: 12px; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -341,249 +394,381 @@
 </style>
 </head>
 <body>
-<div class="aurora"></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="rg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#66db70"/><stop offset=".5" stop-color="#999ea3"/><stop offset="1" stop-color="#d429bd"/></linearGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c1c1e"/><stop offset="1" stop-color="#060607"/></linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".32"/><stop offset="1" stop-color="#fff" stop-opacity=".06"/></linearGradient>
+    <!-- SF Symbol look-alikes for the transport -->
+    <symbol id="i-shuffle" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3.2c2.1 0 3.3 1 4.3 2.8l2.9 4.9c1 1.8 2.3 2.8 4.3 2.8H20"/><path d="M3 17h3.2c1.4 0 2.4-.5 3.2-1.4M14.6 8.4c.8-.9 1.8-1.4 3.2-1.4H20"/><path d="m17.5 4 3 3-3 3M17.5 14l3 3-3 3"/></g></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path fill="currentColor" d="M5 5.2c0-.6.5-1.1 1.1-1.1h.4c.6 0 1.1.5 1.1 1.1v13.6c0 .6-.5 1.1-1.1 1.1h-.4c-.6 0-1.1-.5-1.1-1.1zM19.4 5.4v13.2c0 .9-1 1.4-1.7.9l-9.1-6.6a1.1 1.1 0 0 1 0-1.8l9.1-6.6c.7-.5 1.7 0 1.7.9z"/></symbol>
+    <symbol id="i-back10" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6A8.6 8.6 0 1 0 11.4 3.4"/><path d="m13.6 1.2-2.4 2.2 2.4 2.2"/></g><text x="12" y="15.6" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="7.6" font-weight="700" fill="currentColor">10</text></symbol>
+    <symbol id="i-fwd10" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6A8.6 8.6 0 1 1 12.6 3.4"/><path d="m10.4 1.2 2.4 2.2-2.4 2.2"/></g><text x="12" y="15.6" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="7.6" font-weight="700" fill="currentColor">10</text></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path fill="currentColor" d="M19 5.2c0-.6-.5-1.1-1.1-1.1h-.4c-.6 0-1.1.5-1.1 1.1v13.6c0 .6.5 1.1 1.1 1.1h.4c.6 0 1.1-.5 1.1-1.1zM4.6 5.4v13.2c0 .9 1 1.4 1.7.9l9.1-6.6a1.1 1.1 0 0 0 0-1.8L6.3 4.5c-.7-.5-1.7 0-1.7.9z"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5V10a3.5 3.5 0 0 1 3.5-3.5H19"/><path d="m16 3.5 3 3-3 3"/><path d="M20 12.5V14a3.5 3.5 0 0 1-3.5 3.5H5"/><path d="m8 20.5-3-3 3-3"/></g></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M7 4.6v14.8c0 .9 1 1.4 1.7.9l11.2-7.4a1.1 1.1 0 0 0 0-1.8L8.7 3.7C8 3.2 7 3.7 7 4.6z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path fill="currentColor" d="M6 5.2C6 4.5 6.5 4 7.2 4h2.6c.7 0 1.2.5 1.2 1.2v13.6c0 .7-.5 1.2-1.2 1.2H7.2c-.7 0-1.2-.5-1.2-1.2zM13 5.2c0-.7.5-1.2 1.2-1.2h2.6c.7 0 1.2.5 1.2 1.2v13.6c0 .7-.5 1.2-1.2 1.2h-2.6c-.7 0-1.2-.5-1.2-1.2z"/></symbol>
+    <symbol id="i-apple" viewBox="0 0 24 24"><path fill="currentColor" d="M16.4 12.6c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.8-1.7 0-3.3 1-4.2 2.5-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.3.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9-.1 0-2.8-1-2.8-4.2zM13.9 5.1c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.1.1 2.3-.6 3-1.5z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></g></symbol>
+    <symbol id="i-ok" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-logo" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="url(#tile)"/><rect x=".6" y=".6" width="62.8" height="62.8" rx="14.4" fill="none" stroke="url(#rim)" stroke-width="1.2"/><g fill="url(#rg)"><rect x="17.6" y="24.32" width="3.2" height="15.36" rx="1.6"/><rect x="24.0" y="16.64" width="3.2" height="30.08" rx="1.6"/><rect x="30.4" y="10.88" width="3.2" height="43.52" rx="1.6"/><rect x="36.8" y="17.92" width="3.2" height="28.16" rx="1.6"/><rect x="43.2" y="25.60" width="3.2" height="12.80" rx="1.6"/></g></symbol>
+  </defs>
+</svg>
 
 <nav>
   <div class="wrap">
-    <a class="brand" href="#top">
-      <svg viewBox="0 0 64 64" aria-hidden="true">
-        <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#66db70"/><stop offset=".5" stop-color="#9a9ea3"/><stop offset="1" stop-color="#d429bd"/></linearGradient></defs>
-        <rect width="64" height="64" rx="15" fill="#17171a"/>
-        <g fill="none" stroke="url(#rg)" stroke-width="3"><circle cx="32" cy="32" r="19"/><circle cx="32" cy="32" r="13"/><circle cx="32" cy="32" r="7"/></g>
-      </svg>
-      Sonar
-    </a>
+    <a class="brand" href="#top"><svg aria-hidden="true"><use href="#i-logo"/></svg>Sonar</a>
     <div class="links">
-      <a href="#visualizer">Visualizer</a>
+      <a href="#inside">Features</a>
       <a href="#karaoke">Karaoke</a>
-      <a href="#downloads">Downloads</a>
-      <a href="#features">Features</a>
+      <a href="#more">Details</a>
+      <a href="#download">Install</a>
     </div>
-    <a class="btn btn-primary" href="#download">Download</a>
+    <div class="right-bt">
+      <a class="btn btn-ghost" target="_blank" rel="noopener" href="https://github.com/afterglow1251/music-player-macos-Sonar">GitHub</a>
+      <a class="btn btn-primary dl-link" href="https://github.com/afterglow1251/music-player-macos-Sonar/releases/latest">Download</a>
+    </div>
   </div>
 </nav>
 
-<header class="hero wrap" id="top">
-  <h1>Your music, <span class="lit">lit&nbsp;up.</span></h1>
-  <p class="lead">Sonar is a native Mac music player with a real-time visualizer, karaoke that lights every letter as it's sung, and YouTube downloads straight into your library.</p>
-  <div class="cta">
-    <a class="btn btn-primary dl-link" href="https://github.com/afterglow1251/music-player-macos-Sonar/releases/latest">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.8-1.7 0-3.3 1-4.2 2.5-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.3.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9-.1 0-2.8-1-2.8-4.2zM13.9 5.1c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.1.1 2.3-.6 3-1.5z"/></svg>
-      Download for macOS
-    </a>
-    <a target="_blank" rel="noopener" class="btn btn-ghost" href="https://github.com/afterglow1251/music-player-macos-Sonar">View on GitHub</a>
-  </div>
+<main id="top">
 
-  <div class="stage" id="stage">
-    <div class="window">
-      <div class="titlebar"><i></i><i></i><i></i></div>
-      <div class="app">
-        <div class="left">
-          <div class="cover">
-            <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
-            <span class="grain"></span>
-            <div class="pills">
-              <span><svg viewBox="0 0 24 24" fill="none" stroke="#4ade6b" stroke-width="2"><path d="M4 5h16v11H9l-5 4z"/></svg></span>
-              <span><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span>
-            </div>
-            <div class="art-title"><small>SONAR · DEMO</small>Neon<br>Tide</div>
-          </div>
-          <div class="nowplaying">
-            <div>
-              <div class="src"><i><u></u><u></u><u></u></i> Playing from <b>Library</b></div>
-              <h4>Neon Tide</h4>
-              <p>Afterglow</p>
-            </div>
-            <div class="time" id="clock">01:12 / 03:48</div>
-          </div>
-          <canvas id="viz"></canvas>
-          <div class="wavewrap"><canvas id="wave"></canvas><span class="tip" id="tip">0:00</span></div>
-          <div class="transport">
-            <svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM9.5 12 19 5v14z"/></svg>
-            <span class="play"><svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg></span>
-            <svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM5 5l9.5 7L5 19z"/></svg>
-          </div>
-        </div>
-        <div class="right">
-          <div class="libhead">LIBRARY <span class="n">128</span>
-            <div class="icons">
-              <div class="strip" id="strip">
-                <span class="opt fav"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span>
-                <span class="div"></span>
-                <span class="opt"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3"/></svg></span>
-                <span class="opt on"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></span>
-                <span class="opt"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 18 8 6l4 12M5.5 14h5M15 13a3 3 0 1 1 3 3h-3v-6"/></svg></span>
-                <span class="opt"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span>
-                <svg class="anchor" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
+  <!-- ── hero ─────────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="wrap">
+      <h1>Your music,<br><span class="lit">lit up</span></h1>
+      <p class="sub"><b>A music player for the Mac you'll want to watch.</b> A live visualizer, karaoke that lights every letter as it's sung, and YouTube downloads straight into your library.</p>
+      <div class="cta">
+        <a class="btn btn-primary lg dl-link" href="https://github.com/afterglow1251/music-player-macos-Sonar/releases/latest"><svg aria-hidden="true"><use href="#i-apple"/></svg>Download for macOS</a>
+        <a class="btn btn-ghost lg" target="_blank" rel="noopener" href="https://github.com/afterglow1251/music-player-macos-Sonar">View on GitHub</a>
+      </div>
+      <p class="fine">Free. No account, no subscription.</p>
+
+      <div class="stage" id="stage">
+        <div class="window">
+          <div class="titlebar"><i></i><i></i><i></i></div>
+          <div class="app">
+            <div class="appbg"></div>
+            <div class="left">
+              <div class="cover">
+                <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+                <div class="pills">
+                  <span><svg viewBox="0 0 24 24" fill="none" stroke="#4ade6b" stroke-width="2" stroke-linejoin="round"><path d="M5 4.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4.5 3.5V16.5H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z"/><path d="M8 9.5h1.5M8 12h1.5M13 9.5h1.5M13 12h1.5" stroke-linecap="round"/></svg></span>
+                  <span><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span>
+                </div>
+                <div class="art-title"><small>SONAR · DEMO</small>Neon<br>Tide</div>
               </div>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 7h6l2 2h10v10H3z"/></svg>
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg>
+              <div class="np">
+                <div>
+                  <div class="src"><span class="bars" style="color:var(--magenta)"><u style="height:5px"></u><u style="height:9px"></u><u style="height:6px"></u></span> Playing from <b>Library</b></div>
+                  <h4>Neon Tide</h4>
+                  <p>Afterglow</p>
+                </div>
+                <div class="time" id="clock">01:12 / 03:48</div>
+              </div>
+              <canvas id="viz"></canvas>
+              <div class="wavewrap"><canvas class="wave" id="wave"></canvas><span class="tip">0:00</span></div>
+              <div class="transport">
+                <svg class="off"><use href="#i-shuffle"/></svg>
+                <svg><use href="#i-prev"/></svg>
+                <svg><use href="#i-back10"/></svg>
+                <span class="play"><svg><use href="#i-pause"/></svg></span>
+                <svg><use href="#i-fwd10"/></svg>
+                <svg><use href="#i-next"/></svg>
+                <svg class="off"><use href="#i-repeat"/></svg>
+              </div>
+            </div>
+            <div class="lib">
+              <div class="libhead">LIBRARY <span class="n">128</span>
+                <div class="icons">
+                  <div class="strip" id="strip">
+                    <span class="opt fav"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span>
+                    <span class="div"></span>
+                    <span class="opt"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3"/></svg></span>
+                    <span class="opt on"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></span>
+                    <span class="opt"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 18 8 6l4 12M5.5 14h5M15 13a3 3 0 1 1 3 3h-3v-6"/></svg></span>
+                    <span class="opt"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span>
+                    <svg class="anchor" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
+                  </div>
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 7h6l2 2h10v10H3z"/></svg>
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg>
+                </div>
+              </div>
+              <div class="chips"><span class="chip on">♪ Library</span><span class="chip">Late night</span><span class="chip">Gym</span><span class="chip">Road trip</span></div>
+              <div class="rows">
+                <div class="row"><span class="note">♪</span><span><b>Midnight Circuit</b><small>Lumen Park</small></span><span class="d">03:21</span></div>
+                <div class="row now"><span class="note"><span class="bars live"><u></u><u></u><u></u></span></span><span><b>Neon Tide</b><small>Afterglow</small></span><span class="d">03:48</span></div>
+                <div class="row"><span class="note fav">♪</span><span><b>Paper Satellites</b><small>Kite Theory</small></span><span class="d">04:02</span></div>
+                <div class="row"><span class="note">♪</span><span><b>Glass Horizon</b><small>Nova Arcade</small></span><span class="d">02:57</span></div>
+                <div class="row"><span class="note">♪</span><span><b>Friday Static — Live Mix</b><small>DJ Halcyon</small></span><span class="d">58:14</span></div>
+                <div class="row"><span class="note fav">♪</span><span><b>Slow Motion Summer</b><small>The Driftwoods</small></span><span class="d">03:35</span></div>
+                <div class="row"><span class="note">♪</span><span><b>Violet Hour</b><small>Mira Lane</small></span><span class="d">03:10</span></div>
+                <div class="row"><span class="note">♪</span><span><b>Afterimage</b><small>Lumen Park</small></span><span class="d">03:44</span></div>
+                <div class="row"><span class="note fav">♪</span><span><b>Coastline Radio</b><small>Kite Theory</small></span><span class="d">02:49</span></div>
+                <div class="row"><span class="note">♪</span><span><b>Night Bus Home</b><small>The Driftwoods</small></span><span class="d">03:27</span></div>
+                <div class="row"><span class="note">♪</span><span><b>Sunday Sessions Vol. 3</b><small>DJ Halcyon</small></span><span class="d">1:12:40</span></div>
+              </div>
             </div>
           </div>
-          <div class="chips"><span class="chip on">♪ Library</span><span class="chip">Late night</span><span class="chip">Gym</span><span class="chip">Road trip</span></div>
-          <div class="rows" id="rows">
-            <div class="row"><span class="note">♪</span><span><b>Midnight Circuit</b><small>Lumen Park</small></span><span class="d">03:21</span></div>
-            <div class="row now"><span class="note"><u></u><u></u><u></u></span><span><b>Neon Tide</b><small>Afterglow</small></span><span class="d">03:48</span></div>
-            <div class="row"><span class="note fav">♪</span><span><b>Paper Satellites</b><small>Kite Theory</small></span><span class="d">04:02</span></div>
-            <div class="row"><span class="note">♪</span><span><b>Glass Horizon</b><small>Nova Arcade</small></span><span class="d">02:57</span></div>
-            <div class="row"><span class="note">♪</span><span><b>Friday Static — Live Mix</b><small>DJ Halcyon</small></span><span class="d">58:14</span></div>
-            <div class="row"><span class="note fav">♪</span><span><b>Slow Motion Summer</b><small>The Driftwoods</small></span><span class="d">03:35</span></div>
-            <div class="row"><span class="note">♪</span><span><b>Violet Hour</b><small>Mira Lane</small></span><span class="d">03:10</span></div>
-            <div class="row"><span class="note">♪</span><span><b>Afterimage</b><small>Lumen Park</small></span><span class="d">03:44</span></div>
-            <div class="row"><span class="note fav">♪</span><span><b>Coastline Radio</b><small>Kite Theory</small></span><span class="d">02:49</span></div>
-            <div class="row"><span class="note">♪</span><span><b>Night Bus Home</b><small>The Driftwoods</small></span><span class="d">03:27</span></div>
-            <div class="row"><span class="note">♪</span><span><b>Sunday Sessions Vol. 3</b><small>DJ Halcyon</small></span><span class="d">1:12:40</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── tabbed showcase ──────────────────────────────────────── -->
+  <section class="sec" id="inside">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="eyebrow">Inside Sonar</div>
+        <h2>Three things it does better than the rest</h2>
+        <p>A player you look at as much as you listen to. Pick one and have a play: everything below is live.</p>
+      </div>
+
+      <div class="tabs reveal"><div class="seg" id="tabs" role="tablist">
+        <button class="on" data-pane="viz">Visualizer</button><button data-pane="kar">Karaoke</button><button data-pane="dl">YouTube downloads</button>
+      </div></div>
+
+      <div class="showcase reveal">
+        <div class="pane on" id="pane-viz">
+          <div class="txt">
+            <h3>See the song, not just hear it</h3>
+            <p>The classic stacked tiles, drawn live from the music you're playing, with peaks that fall under gravity. Winamp spirit, built for today's Mac.</p>
+            <ul>
+              <li><b>Three modes:</b> spectrum, oscilloscope and Bloom, a MilkDrop-style kaleidoscope. Double-click to switch.</li>
+              <li><b>Ten themes</b>, or one that takes its colours from the album art.</li>
+              <li><b>Artwork that breathes</b> with the bass.</li>
+            </ul>
+          </div>
+          <div class="demo">
+            <canvas id="bigviz"></canvas>
+            <div class="ctrls">
+              <div class="seg" id="modes"><button class="on" data-mode="spectrum">Spectrum</button><button data-mode="scope">Oscilloscope</button><button data-mode="bloom">Bloom</button></div>
+              <div class="themes" id="themes"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pane" id="pane-kar">
+          <div class="txt">
+            <h3>Every letter, right on the beat</h3>
+            <p>Synced lyrics show up on their own. One click and ElevenLabs times them word by word, down to the letter a singer holds, so the fill follows the voice.</p>
+            <ul>
+              <li><b>Found automatically</b> and kept next to the song, so they work offline.</li>
+              <li><b>Words or letters:</b> switch how the fill moves, live.</li>
+              <li><b>Wrong song?</b> Paste a link or drop in a lyrics file.</li>
+              <li><b>DJ mixes too:</b> every track in a set gets its own lyrics.</li>
+            </ul>
+          </div>
+          <div class="demo">
+            <div class="klines" id="klines"></div>
+            <div class="ctrls"><div class="seg" id="kmode"><button data-mode="words">Words</button><button class="on" data-mode="letters">Letters</button></div></div>
+          </div>
+        </div>
+
+        <div class="pane" id="pane-dl">
+          <div class="txt">
+            <h3>Paste a link, it's yours</h3>
+            <p>Drop a YouTube link into Sonar and it lands in your library as a proper track, with cover art and tags. Queue a few more while it works.</p>
+            <ul>
+              <li><b>Queue as many as you like:</b> paste, press space, paste the next.</li>
+              <li><b>Long mixes keep their chapters</b>, so you can jump between tracks.</li>
+              <li><b>Drag and drop</b> files or links onto the window.</li>
+            </ul>
+          </div>
+          <div class="demo">
+            <div class="field">
+              <span class="fill" id="fill"></span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="2"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+              <span class="ftxt" id="ftxt"></span>
+              <span class="status" id="fstatus"></span>
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#4ade6b"/><path d="M12 7v9M8 12.5l4 4 4-4" stroke="#06170c" stroke-width="2.2" fill="none"/></svg>
+            </div>
+            <div class="dlchips" id="dlchips"></div>
+            <div class="lib">
+              <div class="rows" id="dlrows">
+                <div class="row"><span class="note">♪</span><span><b>Midnight Circuit</b><small>Lumen Park</small></span><span class="d">03:21</span></div>
+                <div class="row"><span class="note">♪</span><span><b>Glass Horizon</b><small>Nova Arcade</small></span><span class="d">02:57</span></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
-</header>
+  </section>
 
-<!-- ── visualizer ──────────────────────────────────────────────── -->
-<section id="visualizer">
-  <div class="wrap split">
-    <div class="copy reveal">
-      <span class="eyebrow">Visualizer</span>
-      <h2>See the song, not just hear it.</h2>
-      <p class="sec-p" style="color:var(--muted);font-size:18px">A real FFT on the audio you're playing, drawn as the classic stacked tiles with peaks that fall under gravity. Winamp spirit, rebuilt natively.</p>
-      <ul>
-        <li><span><b>Three modes.</b> Spectrum, oscilloscope and Bloom, a MilkDrop-style kaleidoscope. Double-click to flip.</span></li>
-        <li><span><b>Ten themes</b>, or one that takes its colours from the album art.</span></li>
-        <li><span><b>Artwork that breathes</b> with the bass, over a backdrop tinted by the cover.</span></li>
-      </ul>
-    </div>
-    <div class="card reveal">
-      <canvas id="bigviz"></canvas>
-      <div class="modes">
-        <button class="on" data-mode="spectrum">Spectrum</button>
-        <button data-mode="scope">Oscilloscope</button>
-        <button data-mode="bloom">Bloom</button>
-        <div class="themes" id="themes"></div>
+  <!-- ── ElevenLabs ───────────────────────────────────────────── -->
+  <section class="sec" id="karaoke">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="eyebrow">Karaoke, powered by ElevenLabs</div>
+        <h2>Any song, even the remix<br>nobody has lyrics for</h2>
+        <p><b>ElevenLabs listens to the track</b> and times every word, down to each letter, so the karaoke follows the singer's actual voice.</p>
       </div>
-    </div>
-  </div>
-</section>
 
-<!-- ── karaoke ─────────────────────────────────────────────────── -->
-<section id="karaoke">
-  <div class="wrap split flip">
-    <div class="copy reveal">
-      <span class="eyebrow">Karaoke</span>
-      <h2>Every letter, right on the beat.</h2>
-      <p style="color:var(--muted);font-size:18px">Synced lyrics show up on their own. One click times them word by word, down to the letter a singer holds, so the fill follows the voice, not a guess.</p>
-      <ul>
-        <li><span><b>Lyrics found automatically</b> from LRCLIB, and cached next to the song so they work offline.</span></li>
-        <li><span><b>Timed to the letter</b> with ElevenLabs: about a cent per song, with your own key.</span></li>
-        <li><span><b>Wrong song? Paste a link</b> or drop in an <span class="mono">.lrc</span> file instead.</span></li>
-        <li><span><b>DJ mixes too:</b> each chapter of a mix gets its own lyrics.</span></li>
-      </ul>
-    </div>
-    <div class="card karaoke reveal">
-      <div class="klines" id="klines"></div>
-      <div class="kbar">
-        <div class="seg" id="kmode"><button data-mode="words">Words</button><button class="on" data-mode="letters">Letters</button></div>
-        <span class="hint">try both</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── downloads ───────────────────────────────────────────────── -->
-<section id="downloads">
-  <div class="wrap split">
-    <div class="copy reveal">
-      <span class="eyebrow">YouTube → Library</span>
-      <h2>Paste a link. It's yours.</h2>
-      <p style="color:var(--muted);font-size:18px">Drop a YouTube URL into Sonar and it lands in your library as a proper track, with cover art and tags. Queue a few more while it works.</p>
-      <ul>
-        <li><span><b>Queue as many as you like:</b> paste, press space, paste the next.</span></li>
-        <li><span><b>Long mixes keep their chapters</b>, so the seek bar shows every track in the set.</span></li>
-        <li><span><b>Drag and drop</b> audio files or links onto the window.</span></li>
-      </ul>
-    </div>
-    <div class="card reveal">
-      <div class="dl">
-        <div class="field" id="field">
-          <span class="fill" id="fill"></span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="2"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
-          <span class="txt" id="ftxt"></span>
-          <span class="status" id="fstatus"></span>
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#4ade6b"/><path d="M12 7v9M8 12.5l4 4 4-4" stroke="#06170c" stroke-width="2.2" fill="none"/></svg>
-        </div>
-        <div class="dlchips" id="dlchips"></div>
-        <div class="right" style="display:flex;margin-top:6px">
-          <div class="rows" id="dlrows">
-            <div class="row"><span class="note">♪</span><span><b>Midnight Circuit</b><small>Lumen Park</small></span><span class="d">03:21</span></div>
-            <div class="row"><span class="note">♪</span><span><b>Glass Horizon</b><small>Nova Arcade</small></span><span class="d">02:57</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── feature grid ────────────────────────────────────────────── -->
-<section id="features">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <span class="eyebrow">And the rest</span>
-      <h2>Built like a Mac app should be.</h2>
-      <p>Small, fast and quiet on your battery, with the little details a Mac app should have.</p>
-    </div>
-    <div class="grid">
-      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10M21 12h0"/></svg></div><h3>Waveform seek bar</h3><p>The song's real shape. Scrub with a drag or a swipe, and hover to see the time.</p></div>
-      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18"/></svg></div><h3>Menu bar mini player</h3><p>Play, skip and seek from the menu bar, even over full-screen apps.</p></div>
-      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></div><h3>10-band equalizer</h3><p>Presets or your own curve, previewed live on the visualizer.</p></div>
-      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="8" height="18" rx="2"/><rect x="13" y="3" width="8" height="18" rx="2"/></svg></div><h3>Two columns when it fits</h3><p>Full screen or a big window spreads out into now playing plus library.</p></div>
-      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></div><h3>Playlists and favorites</h3><p>Hand-made playlists, a favorites filter and multi-select for bulk edits.</p></div>
-      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z"/></svg></div><h3>Sleep timer</h3><p>Stop after 15 to 60 minutes, a custom time, or at the end of the track.</p></div>
-      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M7 14h10"/></svg></div><h3>Keyboard-first</h3><p>Media keys, Now Playing in Control Center, and shortcuts for everything.</p></div>
-      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg></div><h3>Picks up where you left off</h3><p>Same track, same second, every time you open it.</p></div>
-      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><h3>Plays what you have</h3><p>MP3, M4A, WAV, AIFF and FLAC, straight from a folder you choose.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- ── download ────────────────────────────────────────────────── -->
-<section id="download" class="install">
-  <div class="wrap">
-    <span class="eyebrow reveal">Get Sonar</span>
-    <h2 class="reveal">Free. Open source. Yours.</h2>
-    <div class="steps">
-      <div class="step reveal"><span class="num">01</span><h3>Download</h3><p>Grab <code class="dl-name">Sonar.zip</code> and unzip it. Works on any Mac with Apple silicon running macOS 14 or later.</p></div>
-      <div class="step reveal"><span class="num">02</span><h3>Move to Applications</h3><p>Drag <code>Sonar.app</code> into your Applications folder.</p></div>
-      <div class="step reveal"><span class="num">03</span><h3>First launch</h3><p>It's a beta that isn't notarized yet, so <b>right-click → Open</b> the first time. On macOS 15+, use <b>Open Anyway</b> in Privacy &amp; Security.</p></div>
-    </div>
-    <a class="btn btn-primary dl-link reveal" href="https://github.com/afterglow1251/music-player-macos-Sonar/releases/latest">Download for macOS</a>
-
-    <div class="guide reveal">
-      <div class="guide-head">
-        <span class="guide-ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></span>
+      <div class="ks reveal">
         <div>
-          <h3>Turn on YouTube downloads</h3>
-          <p>Playing your own music works right away. To download from YouTube, Sonar needs two free helper tools. It takes a couple of minutes, once.</p>
+        <div class="kpanel" id="kpanel">
+          <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+          <div class="know"><span class="art"></span><div><b>Neon Tide (Night Drive Remix)</b><small>Afterglow</small></div><span class="t" id="ktime">0:24</span></div>
+
+          <div class="kst on" id="kst-a">
+            <div class="msg">No synced lyrics found</div>
+            <div class="go" id="kgo">Sync with ElevenLabs</div>
+          </div>
+          <div class="kst" id="kst-b">
+            <div class="row1"><span class="spin"></span>Syncing words…</div>
+            <div class="cancel">Cancel</div>
+          </div>
+          <div class="kst" id="kst-c">
+            <div class="klines2" id="klines2"></div>
+            <div class="kbar">
+              <span class="kpill">Re-sync with ElevenLabs</span>
+              <div class="seg" id="kmode2"><button data-mode="words">Words</button><button class="on" data-mode="letters">Letters</button></div>
+              <span class="kpill">Wrong lyrics?</span>
+            </div>
+          </div>
+
+          <svg class="cursor" id="kcursor" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 2v14.5l3.8-3.6 2.6 5.6 2.6-1.2-2.6-5.5H15z" fill="#fff" stroke="#000" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="kscrub" id="kscrub" role="slider" aria-label="Demo timeline"><i><b></b></i><i><b></b></i><i><b></b></i><span class="knob"></span></div>
+        </div>
+
+        <ol class="ksteps" id="ksteps">
+          <li class="on"><span class="n">1</span><div><h3>Play anything</h3><p>A remix, a live cut, a song no lyrics site has heard of.</p></div></li>
+          <li><span class="n">2</span><div><h3>Press Sync with ElevenLabs</h3><p>It listens to the track and writes the words down, timed. A few seconds for a song.</p></div></li>
+          <li><span class="n">3</span><div><h3>Sing along, your way</h3><p>Fill by word or by letter, and switch any time. Try it on the left.</p></div></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── bento ────────────────────────────────────────────────── -->
+  <section class="sec" id="more">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="eyebrow">And the rest</div>
+        <h2>Built like a Mac app<br>should be</h2>
+        <p><b>Small, fast and quiet on your battery.</b> With the little details you notice the second day, not the first.</p>
+      </div>
+
+      <div class="bento">
+        <div class="card big reveal" style="--c:#4ade6b">
+          <div class="vis"><div style="width:100%">
+            <div class="wmeta" id="wmeta"><span><b id="wtitle">Neon Tide</b> <small id="wartist">Afterglow</small></span><span class="t" id="wtime">0:00 / 3:48</span></div>
+            <div class="wavewrap"><canvas class="wave" id="wave2" style="height:70px"></canvas><span class="tip">0:00</span></div>
+          </div></div>
+          <div class="body"><h3>The song's real shape</h3><p>The seek bar is the track's waveform. Drag or swipe to scrub, hover to see the time. Try it.</p></div>
+        </div>
+        <div class="card big reveal" style="--c:#d429bd">
+          <div class="vis">
+            <div class="menubar">
+              <div class="mb">
+                <span class="me"><svg viewBox="0 0 230 232" fill="#fff"><rect x="25" y="95" width="16" height="43" rx="8"/><rect x="58" y="55" width="16" height="123" rx="8"/><rect x="91" y="16" width="15" height="201" rx="7.5"/><rect x="124" y="67" width="15" height="99" rx="7.5"/><rect x="156" y="38" width="16" height="157" rx="8"/><rect x="189" y="87" width="16" height="59" rx="8"/></svg></span>
+                <span>Thu 21:04</span>
+              </div>
+              <div class="mini">
+                <div class="top" id="mtop"><span class="art" id="mart"></span><div><b id="mtitle">Neon Tide</b><small id="martist">Afterglow</small></div>
+                  <svg class="show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M3 9h18"/></svg></div>
+                <div><canvas class="wave" id="wave3"></canvas><div class="mtimes"><span id="mnow">0:00</span><span id="mdur">3:48</span></div></div>
+                <div class="tr">
+                  <svg><use href="#i-prev"/></svg>
+                  <svg class="pp"><use href="#i-pause"/></svg>
+                  <svg><use href="#i-next"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="body"><h3>Right in the menu bar</h3><p>Play, skip and seek from the menu bar without leaving what you're doing, even over full-screen apps.</p></div>
+        </div>
+        <div class="card reveal" style="--c:#4ade6b"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></div><div class="body"><h3>10-band equalizer</h3><p>Presets or your own curve, previewed live.</p></div></div>
+        <div class="card reveal" style="--c:#d429bd"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="8" height="18" rx="2"/><rect x="13" y="3" width="8" height="18" rx="2"/></svg></div><div class="body"><h3>Two columns when it fits</h3><p>A big window spreads into player plus library.</p></div></div>
+        <div class="card reveal" style="--c:#4ade6b"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></div><div class="body"><h3>Playlists and favorites</h3><p>Your own playlists and a one-click favorites filter.</p></div></div>
+        <div class="card reveal" style="--c:#d429bd"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z"/></svg></div><div class="body"><h3>Sleep timer</h3><p>Stop after a set time or at the end of the track.</p></div></div>
+        <div class="card reveal" style="--c:#d429bd"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 6h18M3 12h12M3 18h7"/><circle cx="18" cy="17" r="3"/></svg></div><div class="body"><h3>Mixes with chapters</h3><p>Hour-long sets show every track and jump between them.</p></div></div>
+        <div class="card reveal" style="--c:#4ade6b"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M7 14h10"/></svg></div><div class="body"><h3>Keyboard-first</h3><p>Media keys, Control Center and shortcuts for everything.</p></div></div>
+        <div class="card reveal" style="--c:#d429bd"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg></div><div class="body"><h3>Picks up where you left off</h3><p>Same track, same second, every time.</p></div></div>
+        <div class="card reveal" style="--c:#4ade6b"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><div class="body"><h3>Plays what you have</h3><p>MP3, M4A, WAV, AIFF and FLAC from any folder.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── install ──────────────────────────────────────────────── -->
+  <section class="sec" id="download">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="eyebrow">Get Sonar</div>
+        <h2>Free, and yours in a minute</h2>
+        <p><b>No account, no subscription.</b> Download it, drop it into Applications, and press play.</p>
+      </div>
+
+      <div class="steps">
+        <div class="step reveal"><span class="num">1</span><h3>Download</h3><p>Get the latest version of Sonar and unzip it.</p></div>
+        <div class="step reveal"><span class="num">2</span><h3>Move to Applications</h3><p>Drag <code>Sonar.app</code> into your Applications folder.</p></div>
+        <div class="step reveal"><span class="num">3</span><h3>Let it open</h3><p>macOS blocks apps from outside the App Store the first time. Paste this into <b>Terminal</b> once, then open Sonar as usual:</p>
+          <div class="cmd"><code>xattr -dr com.apple.quarantine /Applications/Sonar.app</code><button class="copybtn" aria-label="Copy" title="Copy"><svg class="i-copy"><use href="#i-copy"/></svg><svg class="i-ok"><use href="#i-ok"/></svg></button></div></div>
+      </div>
+      <div class="dl-row reveal">
+        <a class="btn btn-primary lg dl-link" href="https://github.com/afterglow1251/music-player-macos-Sonar/releases/latest"><svg aria-hidden="true"><use href="#i-apple"/></svg>Download for macOS</a>
+      </div>
+
+      <div class="guides">
+        <div class="guide reveal">
+          <div class="gh">
+            <span class="tag">Optional</span>
+            <h3>Turn on YouTube downloads</h3>
+            <p>Playing your own music works right away. To download from YouTube, Sonar needs two free helper tools. It takes a couple of minutes, once.</p>
+          </div>
+          <ol>
+            <li>
+              <b>Install Homebrew</b>, the Mac's installer for tools like these. Open <b>Terminal</b> (⌘ Space, type "Terminal"), paste this and press Return:
+              <div class="cmd"><code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code><button class="copybtn" aria-label="Copy" title="Copy"><svg class="i-copy"><use href="#i-copy"/></svg><svg class="i-ok"><use href="#i-ok"/></svg></button></div>
+              <small>Already have it? Skip ahead. Details at <a class="u" href="https://brew.sh" target="_blank" rel="noopener">brew.sh</a>.</small>
+            </li>
+            <li>
+              <b>Install the download tools</b> with one more command:
+              <div class="cmd"><code>brew install yt-dlp ffmpeg</code><button class="copybtn" aria-label="Copy" title="Copy"><svg class="i-copy"><use href="#i-copy"/></svg><svg class="i-ok"><use href="#i-ok"/></svg></button></div>
+            </li>
+            <li><b>Restart Sonar</b>, paste a YouTube link, and it lands in your library.</li>
+          </ol>
+        </div>
+
+        <div class="guide reveal">
+          <div class="gh">
+            <span class="tag">Optional</span>
+            <h3>Turn on letter-perfect karaoke</h3>
+            <p>Line-synced lyrics work without any setup. To time them to the letter, or to get lyrics for songs that have none, connect your ElevenLabs key.</p>
+          </div>
+          <ol>
+            <li><b>Create an ElevenLabs account</b> at <a class="u" href="https://elevenlabs.io" target="_blank" rel="noopener">elevenlabs.io</a>.</li>
+            <li>
+              <b>Make an API key</b> in <a class="u" href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener">Settings → API Keys</a>.
+              <small>Give it access to <b>Forced Alignment</b> and <b>Speech to Text</b>. Nothing else is needed.</small>
+            </li>
+            <li><b>Paste it into Sonar</b>: Settings → ElevenLabs. It's kept in your Keychain.</li>
+            <li><b>Open the lyrics</b> of any song and press <b>Sync with ElevenLabs</b>.</li>
+          </ol>
         </div>
       </div>
-      <ol>
-        <li>
-          <b>Install Homebrew</b>, the Mac's app installer for tools like these. Open <b>Terminal</b> (⌘ Space, type "Terminal"), paste this and press Return:
-          <div class="cmd"><code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code><button class="copy">Copy</button></div>
-          <small>Already have it? Skip to the next step. Details at <a href="https://brew.sh" target="_blank" rel="noopener">brew.sh</a>.</small>
-        </li>
-        <li>
-          <b>Install the download tools</b> with one more command:
-          <div class="cmd"><code>brew install yt-dlp ffmpeg</code><button class="copy">Copy</button></div>
-        </li>
-        <li><b>Restart Sonar</b>, paste a YouTube link, and it lands in your library.</li>
-      </ol>
     </div>
-  </div>
-</section>
+  </section>
+
+  <!-- ── closing ──────────────────────────────────────────────── -->
+  <section class="final reveal">
+    <div class="wrap">
+      <svg class="rings" aria-hidden="true"><use href="#i-logo"/></svg>
+      <h2>Press play</h2>
+      <div class="cta">
+        <a class="btn btn-primary lg dl-link" href="https://github.com/afterglow1251/music-player-macos-Sonar/releases/latest"><svg aria-hidden="true"><use href="#i-apple"/></svg>Download for macOS</a>
+        <a class="btn btn-ghost lg" target="_blank" rel="noopener" href="https://github.com/afterglow1251/music-player-macos-Sonar">View on GitHub</a>
+      </div>
+    </div>
+  </section>
+</main>
 
 <footer>
   <div class="wrap">
-    <span class="brand" style="font-size:15px">Sonar</span>
+    <span class="brand" style="font-size:15px"><svg aria-hidden="true" style="width:20px;height:20px"><use href="#i-logo"/></svg>Sonar</span>
     <div class="links">
       <a target="_blank" rel="noopener" href="https://github.com/afterglow1251/music-player-macos-Sonar">GitHub</a>
       <a target="_blank" rel="noopener" href="https://github.com/afterglow1251/music-player-macos-Sonar/releases">Releases</a>
@@ -595,200 +780,298 @@
 (() => {
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const t0 = performance.now();
+  const now = () => (performance.now() - t0) / 1000;
 
   // ── a fake but musical signal: kick every beat, snare on 2 and 4, hats ──
   const BPM = 124, beat = 60 / BPM;
-  const t0 = performance.now();
-  const now = () => (performance.now() - t0) / 1000;
   function bands(t, n) {
     const ph = (t % beat) / beat, bar = Math.floor(t / beat) % 4;
     const kick = Math.exp(-ph * 7), snare = (bar % 2) ? Math.exp(-ph * 9) : 0, hat = Math.exp(-((t % (beat / 2)) / (beat / 2)) * 10);
     const out = [];
     for (let i = 0; i < n; i++) {
       const f = i / (n - 1);
-      let v = 0.55 * kick * Math.exp(-f * 6)            // low end thump
-            + 0.35 * snare * Math.exp(-((f - .35) ** 2) * 30)
-            + 0.28 * hat * Math.exp(-((f - .8) ** 2) * 20)
-            + 0.30 * (0.55 + 0.45 * Math.sin(t * 1.3 + i * .6)) * (1 - f * .55)   // pads
-            + 0.08 * Math.sin(t * 7 + i * 2.3);
+      const v = 0.55 * kick * Math.exp(-f * 6) + 0.35 * snare * Math.exp(-((f - .35) ** 2) * 30)
+              + 0.28 * hat * Math.exp(-((f - .8) ** 2) * 20) + 0.30 * (0.55 + 0.45 * Math.sin(t * 1.3 + i * .6)) * (1 - f * .55)
+              + 0.08 * Math.sin(t * 7 + i * 2.3);
       out.push(Math.max(0, Math.min(1, v * 1.55 * (0.85 + 0.15 * Math.sin(t * .4)))));
     }
     return out;
   }
-
+  // The app's analyzer gives 19 bars; wide layouts interpolate them ×2.
+  const upsample = (v, k) => { if (k < 2) return v; const o = []; for (let i = 0; i < v.length; i++) { const a = v[i], b = v[Math.min(i + 1, v.length - 1)]; for (let j = 0; j < k; j++) o.push(a + (b - a) * j / k); } return o; };
   function fit(c) {
     const r = c.getBoundingClientRect();
-    if (c.width !== Math.round(r.width * dpr) || c.height !== Math.round(r.height * dpr)) {
-      c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
-    }
+    if (!r.width) return [0, 0];
+    if (c.width !== Math.round(r.width * dpr) || c.height !== Math.round(r.height * dpr)) { c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); }
     return [c.width, c.height];
   }
 
-  // ── themes: the tile gradient, bottom → top ─────────────────────────────
+  // ── the app's themes: tile gradient bottom → top, peak, oscilloscope ────
   const THEMES = [
-    ["#4ade6b", "#e6f25a", "#ff5a4a"],   // classic
-    ["#38bdf8", "#a855f7", "#f472b6"],   // neon
-    ["#5b8cff", "#7aa7ff", "#dfe8ff"],   // ice
-    ["#ff9f43", "#ff5e62", "#ff2f92"],   // sunset
-    ["#d429bd", "#9a9ea3", "#66db70"],   // sonar
+    { stops: [[0,208,0],[216,208,0],[240,120,0],[240,16,0]], peak: "#bfbfbf", osc: "#24de3d" },          // Classic
+    { stops: [[0,110,255],[0,200,255],[130,230,255],[235,250,255]], peak: "#fff", osc: "#5acdff" },        // Ice
+    { stops: [[150,0,0],[240,70,0],[255,170,0],[255,240,140]], peak: "#fff", osc: "#ff8c00" },            // Fire
+    { stops: [[148,0,211],[0,60,255],[0,200,0],[255,235,0],[255,0,0]], peak: "#fff", osc: "#c878ff" },    // Rainbow
+    { stops: [[110,0,130],[200,0,190],[255,60,200],[255,185,240]], peak: "#fff", osc: "#ff50dc" },        // Magenta
+    { stops: [[255,0,140],[200,0,255],[0,180,255],[0,255,220]], peak: "#fff", osc: "#00ffdc" },           // Neon
   ];
   let theme = 0;
-  const mix = (a, b, k) => {
-    const p = s => [1, 3, 5].map(j => parseInt(s.slice(j, j + 2), 16));
-    const [x, y] = [p(a), p(b)];
-    return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * k)).join(",")})`;
-  };
-  const tileColor = (f, th) => f < .5 ? mix(th[0], th[1], f * 2) : mix(th[1], th[2], (f - .5) * 2);
+  // 16 discrete steps like the app's `gradient(count: 16)`, picked per row.
+  function tileColor(row, rows, th) {
+    const step = Math.round(row / Math.max(1, rows - 1) * 15), t = step / 15 * (th.stops.length - 1);
+    const lo = Math.floor(t), hi = Math.min(lo + 1, th.stops.length - 1), f = t - lo;
+    return `rgb(${[0, 1, 2].map(c => Math.round(th.stops[lo][c] + (th.stops[hi][c] - th.stops[lo][c]) * f)).join(",")})`;
+  }
+  const css = th => `linear-gradient(to top right, ${tileColor(0, 16, th)}, ${tileColor(8, 16, th)}, ${tileColor(15, 16, th)})`;
 
-  // ── spectrum tiles with falling peaks (the app's signature look) ───────
-  function makeSpectrum(canvas, cols, rows) {
-    const peaks = new Array(cols).fill(0), vel = new Array(cols).fill(0);
+  // ── spectrum tiles with falling peaks, drawn like VisualizerView ────────
+  function makeSpectrum(canvas, bars, scale, rows) {
+    const cols = bars * scale, peaks = new Array(cols).fill(0), vel = new Array(cols).fill(0);
     let mode = "spectrum", last = now();
-    const api = {
+    return {
       set mode(m) { mode = m; },
       draw() {
-        const [w, h] = fit(canvas), ctx = canvas.getContext("2d"), t = now(), dt = Math.min(.05, t - last); last = t;
+        const [w, h] = fit(canvas); if (!w) return;
+        const ctx = canvas.getContext("2d"), t = now(), dt = Math.min(.05, t - last); last = t;
         ctx.clearRect(0, 0, w, h);
         const th = THEMES[theme];
         if (mode === "spectrum") {
-          const b = bands(t, cols), gap = Math.max(1, 2 * dpr), cw = (w - gap * (cols - 1)) / cols, rh = (h - gap * (rows - 1)) / rows;
+          const b = upsample(bands(t, bars), scale), gap = dpr, slot = w / cols, bw = Math.max(1, Math.floor(slot) - gap), th1 = h / rows;
           for (let i = 0; i < cols; i++) {
-            const lit = Math.round(b[i] * rows);
-            for (let r = 0; r < lit; r++) {
-              ctx.fillStyle = tileColor(r / (rows - 1), th);
-              ctx.fillRect(i * (cw + gap), h - (r + 1) * rh - r * gap, cw, rh);
-            }
-            if (b[i] >= peaks[i]) { peaks[i] = b[i]; vel[i] = 0; } else { vel[i] += 2.2 * dt; peaks[i] = Math.max(0, peaks[i] - vel[i] * dt); }
-            const pr = Math.min(rows - 1, Math.round(peaks[i] * rows));
-            ctx.fillStyle = "rgba(255,255,255,.9)";
-            ctx.fillRect(i * (cw + gap), h - (pr + 1) * rh - pr * gap, cw, Math.max(2, rh * .45));
+            const x = Math.floor(i * slot), lit = Math.round(b[i] * rows);
+            for (let r = 0; r < lit; r++) { ctx.fillStyle = tileColor(r, rows, th); ctx.fillRect(x, h - (r + 1) * th1 + gap, bw, Math.max(1, th1 - gap)); }
+            if (b[i] >= peaks[i]) { peaks[i] = b[i]; vel[i] = 0; } else { vel[i] += 1.6 * dt; peaks[i] = Math.max(0, peaks[i] - vel[i] * dt); }
+            const pl = Math.round(peaks[i] * rows);
+            if (pl > 0) { ctx.fillStyle = th.peak; ctx.fillRect(x, h - pl * th1 + gap, bw, Math.max(1, th1 - gap)); }
           }
         } else if (mode === "scope") {
-          const b = bands(t, 8);
-          ctx.lineWidth = 2.2 * dpr; ctx.lineJoin = "round";
-          for (let pass = 0; pass < 2; pass++) {
-            ctx.beginPath();
-            for (let x = 0; x <= w; x += 2 * dpr) {
-              const u = x / w;
-              let y = 0;
-              for (let k = 0; k < 8; k++) y += b[k] * Math.sin(u * (6 + k * 9) * Math.PI + t * (3 + k) + k);
-              y = h / 2 + y * h * .11 * (pass ? .6 : 1);
-              x ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-            }
-            ctx.strokeStyle = pass ? th[2] : th[0]; ctx.globalAlpha = pass ? .5 : 1; ctx.shadowColor = th[0]; ctx.shadowBlur = 14 * dpr;
-            ctx.stroke();
+          const b = bands(t, 8); ctx.lineWidth = 2 * dpr; ctx.lineJoin = "round";
+          ctx.beginPath();
+          for (let x = 0; x <= w; x += 2 * dpr) {
+            const u = x / w; let y = 0;
+            for (let k = 0; k < 8; k++) y += b[k] * Math.sin(u * (6 + k * 9) * Math.PI + t * (3 + k) + k);
+            y = h / 2 + Math.tanh(y * .5) * h * .4; x ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
           }
-          ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+          ctx.strokeStyle = th.osc; ctx.shadowColor = th.osc; ctx.shadowBlur = 10 * dpr; ctx.stroke(); ctx.shadowBlur = 0;
         } else {
           const b = bands(t, 24), cx = w / 2, cy = h / 2, R = Math.min(w, h) * .46, arms = 12;
           ctx.globalCompositeOperation = "lighter";
           for (let a = 0; a < arms; a++) {
-            ctx.save(); ctx.translate(cx, cy); ctx.rotate(a / arms * Math.PI * 2 + t * .25);
-            if (a % 2) ctx.scale(1, -1);
+            ctx.save(); ctx.translate(cx, cy); ctx.rotate(a / arms * Math.PI * 2 + t * .25); if (a % 2) ctx.scale(1, -1);
             ctx.beginPath(); ctx.moveTo(0, 0);
-            for (let i = 0; i < b.length; i++) {
-              const r = (i / b.length) * R, off = b[i] * R * .28 * Math.sin(i * .9 + t * 2);
-              ctx.lineTo(r, off);
-            }
-            ctx.strokeStyle = tileColor(a / arms, th); ctx.lineWidth = 2 * dpr; ctx.globalAlpha = .7; ctx.stroke();
-            ctx.restore();
+            for (let i = 0; i < b.length; i++) ctx.lineTo((i / b.length) * R, b[i] * R * .28 * Math.sin(i * .9 + t * 2));
+            ctx.strokeStyle = tileColor(a, arms, th); ctx.lineWidth = 2 * dpr; ctx.globalAlpha = .7; ctx.stroke(); ctx.restore();
           }
+          const bass = b[0]; ctx.globalAlpha = .9; ctx.fillStyle = th.peak; ctx.beginPath(); ctx.arc(cx, cy, (4 + bass * 8) * dpr, 0, 7); ctx.fill();
           ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
         }
       }
     };
-    return api;
   }
+  // Hero = the app's two-column layout: 19 bars ×2, 22 rows. Big demo = fullscreen-ish.
+  const heroViz = makeSpectrum(document.getElementById("viz"), 19, 2, 22);
+  const bigViz = makeSpectrum(document.getElementById("bigviz"), 19, 2, 26);
 
-  const heroViz = makeSpectrum(document.getElementById("viz"), 34, 12);
-  const bigViz = makeSpectrum(document.getElementById("bigviz"), 40, 18);
-
-  // ── waveform seek bar: mirrored bars, played part in accent ────────────
-  const wave = document.getElementById("wave"), tip = document.getElementById("tip");
-  const DUR = 228, peaksW = [];
-  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  for (let i = 0; i < 160; i++) { const env = .35 + .65 * Math.sin(Math.PI * i / 160) ** .6; peaksW.push(Math.max(.08, env * (.45 + .55 * rnd()))); }
-  let pos = 72, hoverX = null;
-  wave.addEventListener("mousemove", e => { const r = wave.getBoundingClientRect(); hoverX = (e.clientX - r.left) / r.width; tip.style.left = `${Math.max(6, Math.min(94, hoverX * 100))}%`; tip.textContent = fmt(hoverX * DUR); });
-  wave.addEventListener("mouseleave", () => hoverX = null);
-  wave.addEventListener("click", e => { const r = wave.getBoundingClientRect(); pos = (e.clientX - r.left) / r.width * DUR; });
+  // ── waveform seek bars: mirrored bars, played part in accent, hover + click ─
   const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   const pad = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-  function drawWave(dt) {
-    pos = (pos + dt) % DUR;
-    document.getElementById("clock").textContent = `${pad(pos)} / ${pad(DUR)}`;
-    const [w, h] = fit(wave), ctx = wave.getContext("2d"), n = peaksW.length, bw = w / n;
-    ctx.clearRect(0, 0, w, h);
-    for (let i = 0; i < n; i++) {
-      const x = i * bw, played = i / n < pos / DUR, bh = peaksW[i] * h;
-      let lift = 1;
-      if (hoverX !== null) lift = 1 + .35 * Math.exp(-((((i / n) - hoverX) * 18) ** 2));
-      ctx.fillStyle = played ? "#4ade6b" : (hoverX !== null && i / n < hoverX ? "rgba(255,255,255,.45)" : "rgba(255,255,255,.22)");
-      ctx.fillRect(x, (h - bh * lift) / 2, Math.max(1, bw - dpr), bh * lift);
-    }
+  // A song's loudness shape: each kind of track looks different on the seek bar.
+  const SHAPES = {
+    arc:    f => .35 + .65 * Math.sin(Math.PI * f) ** .6,                                        // rises and falls
+    drop:   f => f < .12 ? .18 + f * 2 : f < .42 ? .4 + (f - .12) * .9 : f < .5 ? .22 : .95 - (f > .9 ? (f - .9) * 6 : 0),   // intro, build, silence, drop
+    ballad: f => .15 + .55 * Math.sin(Math.PI * f) ** 2 + (f > .6 && f < .78 ? .3 : 0),            // soft, one big chorus
+    club:   f => (Math.floor(f * 8) % 4 === 3 ? .35 : .9) * (f < .05 ? f * 20 : 1),                // steady, a breakdown every few bars
+    live:   f => .3 + .5 * Math.abs(Math.sin(f * 9.5)) + (f > .85 ? -.2 : 0),                       // a mix: sets rising and falling
+  };
+  function makePeaks(seed, n, shape) {
+    const out = []; let s = seed; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < n; i++) out.push(Math.max(.08, Math.min(1, shape(i / n)) * (.5 + .5 * rnd())));
+    return out;
   }
+  function makeWave(canvas, seed, n, dur, start, { speed = 1, songSecs = 0, shape = SHAPES.arc, onEnd } = {}) {
+    if (songSecs) speed = dur / songSecs;   // every song takes the same few seconds, however long it is
+    const tip = canvas.parentElement.querySelector(".tip");
+    let peaks = makePeaks(seed, n, shape), from = peaks, morph = 1;
+    let pos = start, hover = null;
+    canvas.addEventListener("mousemove", e => { const r = canvas.getBoundingClientRect(); hover = (e.clientX - r.left) / r.width;
+      if (tip) { tip.style.left = `${Math.max(6, Math.min(94, hover * 100))}%`; tip.textContent = fmt(hover * dur); } });
+    canvas.addEventListener("mouseleave", () => hover = null);
+    canvas.addEventListener("click", e => { const r = canvas.getBoundingClientRect(); pos = (e.clientX - r.left) / r.width * dur; });
+    return {
+      get pos() { return pos; },
+      get dur() { return dur; },
+      // a new song: its bars flow out of the old ones' shape
+      load(newPeaks, newDur) { from = peaks.map((p, i) => from[i] + (p - from[i]) * morph); peaks = newPeaks; morph = 0; dur = newDur; pos = 0; if (songSecs) speed = dur / songSecs; },
+      draw(dt) {
+        pos += dt * speed;
+        if (pos >= dur) { if (onEnd) onEnd(); else pos %= dur; }
+        morph = Math.min(1, morph + dt * 1.6);
+        const k = morph < .5 ? 2 * morph * morph : 1 - (-2 * morph + 2) ** 2 / 2;
+        const [w, h] = fit(canvas); if (!w) return;
+        const ctx = canvas.getContext("2d"), bw = w / n; ctx.clearRect(0, 0, w, h);
+        for (let i = 0; i < n; i++) {
+          const f = i / n, played = f < pos / dur, bh = (from[i] + (peaks[i] - from[i]) * k) * h;
+          const lift = hover === null ? 1 : 1 + .35 * Math.exp(-(((f - hover) * 18) ** 2));
+          ctx.fillStyle = played ? "#4ade6b" : (hover !== null && f < hover ? "rgba(255,255,255,.45)" : "rgba(255,255,255,.22)");
+          ctx.fillRect(i * bw, (h - bh * lift) / 2, Math.max(1, bw - dpr), bh * lift);
+        }
+      }
+    };
+  }
+  const DUR = 228;
+  const waves = [makeWave(document.getElementById("wave"), 7, 160, DUR, 72),
+                 makeWave(document.getElementById("wave2"), 19, 220, DUR, 0, { songSecs: 9, onEnd: () => nextSong() }),
+                 makeWave(document.getElementById("wave3"), 7, 80, DUR, 0, { songSecs: 8, onEnd: () => nextMini() })];
 
-  // ── theme dots + mode buttons ───────────────────────────────────────────
+  // The bento waveform plays through a little playlist, fast, each song its own shape.
+  const SONGS = [
+    ["Neon Tide", "Afterglow", 228, "arc"], ["Paper Satellites", "Kite Theory", 242, "drop"], ["Slow Motion Summer", "The Driftwoods", 215, "ballad"],
+    ["Midnight Circuit", "Lumen Park", 201, "club"], ["Friday Static — Live Mix", "DJ Halcyon", 3494, "live"],
+  ];
+  const wmeta = document.getElementById("wmeta");
+  let song = 0;
+  function nextSong() {
+    song = (song + 1) % SONGS.length;
+    const [title, artist, dur, shape] = SONGS[song];
+    waves[1].load(makePeaks(31 + song * 17, 220, SHAPES[shape]), dur);
+    wmeta.classList.add("swap");
+    setTimeout(() => { document.getElementById("wtitle").textContent = title; document.getElementById("wartist").textContent = artist; wmeta.classList.remove("swap"); }, 250);
+  }
+  // The menu-bar mini player shuffles through the same songs, each with its own cover.
+  const ARTS = ["linear-gradient(135deg, #d429bd, #3b6cff 60%, #4ade6b)", "linear-gradient(135deg, #ff9f43, #ff5a73 55%, #6b2bd9)",
+                "linear-gradient(135deg, #facc15, #ff9f43 50%, #ff5a73)", "linear-gradient(135deg, #38bdf8, #5b8cff 50%, #1b1f5e)",
+                "linear-gradient(135deg, #4ade6b, #0e7490 55%, #111)"];
+  const mtop = document.getElementById("mtop"), mart = document.getElementById("mart");
+  let mini = 0;
+  function nextMini() {
+    mini = (mini + 2) % SONGS.length;   // a different song than the card beside it, usually
+    const [title, artist, dur, shape] = SONGS[mini];
+    waves[2].load(makePeaks(53 + mini * 11, 80, SHAPES[shape]), dur);
+    mart.style.background = ARTS[mini];
+    mtop.classList.add("swap");
+    setTimeout(() => { document.getElementById("mtitle").textContent = title; document.getElementById("martist").textContent = artist; mtop.classList.remove("swap"); }, 250);
+  }
+  const clockOf = s => s >= 3600 ? `${Math.floor(s / 3600)}:${pad(s % 3600)}` : fmt(s);
+
+  // ── segmented controls ──────────────────────────────────────────────────
+  function seg(id, onPick) {
+    const el = document.getElementById(id), btns = el.querySelectorAll("button");
+    const thumb = document.createElement("span"); thumb.className = "thumb"; el.prepend(thumb);
+    // The first placement (once the control is actually visible) jumps; later ones glide.
+    const place = () => { const on = el.querySelector("button.on"); if (!on || !on.offsetWidth) return;
+      const first = !thumb.style.width;
+      if (first) thumb.style.transition = "none";
+      thumb.style.width = `${on.offsetWidth}px`; thumb.style.transform = `translateX(${on.offsetLeft}px)`;
+      if (first) { thumb.offsetWidth; thumb.style.transition = ""; } };
+    place();
+    btns.forEach(b => b.onclick = () => { btns.forEach(x => x.classList.toggle("on", x === b)); place(); onPick(b); });
+    addEventListener("resize", place); document.fonts?.ready.then(place);
+    // Panes start hidden, so their controls measure 0 until shown.
+    new ResizeObserver(place).observe(el);
+  }
+  seg("tabs", b => document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.id === `pane-${b.dataset.pane}`)));
+  seg("modes", b => bigViz.mode = b.dataset.mode);
+
   const themesEl = document.getElementById("themes");
   THEMES.forEach((th, i) => {
-    const dot = document.createElement("i");
-    dot.style.background = `linear-gradient(135deg, ${th[0]}, ${th[2]})`;
-    dot.title = "Theme";
+    const dot = document.createElement("i"); dot.style.background = css(th);
     if (!i) dot.classList.add("on");
     dot.onclick = () => { theme = i; themesEl.querySelectorAll("i").forEach(d => d.classList.toggle("on", d === dot)); };
     themesEl.append(dot);
   });
-  document.querySelectorAll(".modes button").forEach(b => b.onclick = () => {
-    document.querySelectorAll(".modes button").forEach(x => x.classList.toggle("on", x === b));
-    bigViz.mode = b.dataset.mode;
-  });
 
   // ── karaoke: real per-letter timing, incl. held notes ───────────────────
-  // Original demo lines. Each word: [text, start, per-letter durations...]
-  // Some letters are held ("looooow") — the Letters fill waits on them,
-  // exactly like a real ElevenLabs-timed song.
   const LYRICS = [
     [["Turn", 0.0], ["the", .42], ["lights", .66], ["down", 1.12], ["low", 1.6, [.12, 1.1, .2]]],
     [["let", 3.3], ["the", 3.55], ["bassline", 3.8], ["lead", 4.6], ["the", 4.95], ["way", 5.2, [.15, .8, .25]]],
     [["every", 6.9], ["word", 7.4], ["you", 7.85], ["know", 8.2, [.1, .12, .9, .2]]],
     [["lights", 9.9], ["up", 10.45], ["as", 10.8], ["you", 11.05], ["sing", 11.35, [.1, .7, .15, .2]], ["it", 12.1]],
   ];
+  const letterTimes = (w, start, durs) => {
+    const letters = [...w], ds = durs || letters.map(() => Math.min(.12, .5 / letters.length));
+    let t = start; return letters.map((_, k) => { const at = t; t += ds[k] || .08; return at; });
+  };
   const LOOP = 14;
-  const klines = document.getElementById("klines");
-  const lineEls = LYRICS.map(words => {
-    const el = document.createElement("div"); el.className = "kline";
-    words.forEach(([w, start, durs], wi) => {
-      const letters = [...w], ds = durs || letters.map(() => Math.min(.12, .5 / letters.length));
-      let t = start; const times = letters.map((_, k) => { const at = t; t += ds[k] || .08; return at; });
-      const span = document.createElement("span"); span.dataset.start = start;
-      letters.forEach((ch, k) => { const s = document.createElement("span"); s.textContent = ch; s.dataset.t = times[k]; span.append(s); });
-      el.append(span); if (wi < words.length - 1) el.append(" ");
+  // Build a karaoke block in `box`; returns draw(t, mode) for a time t within LOOP.
+  function makeKaraoke(box) {
+    const lines = LYRICS.map(words => {
+      const el = document.createElement("div"); el.className = "kline";
+      words.forEach(([w, start, durs], wi) => {
+        const times = letterTimes(w, start, durs);
+        const span = document.createElement("span"); span.dataset.start = start;
+        [...w].forEach((ch, k) => { const s = document.createElement("span"); s.textContent = ch; s.dataset.t = times[k]; span.append(s); });
+        el.append(span); if (wi < words.length - 1) el.append(" ");
+      });
+      box.append(el); return el;
     });
-    klines.append(el); return el;
-  });
-  let kmode = "letters";
-  document.querySelectorAll("#kmode button").forEach(b => b.onclick = () => {
-    kmode = b.dataset.mode;
-    document.querySelectorAll("#kmode button").forEach(x => x.classList.toggle("on", x === b));
-  });
-  function drawKaraoke() {
-    const t = now() % LOOP;
-    lineEls.forEach((el, li) => {
+    return (t, mode) => lines.forEach((el, li) => {
       const start = LYRICS[li][0][1], next = li + 1 < LYRICS.length ? LYRICS[li + 1][0][1] : LOOP - .6;
       const active = t >= start && t < next;
       el.classList.toggle("active", active);
-      // Only the line being sung fills — sung lines dim again, like in the app.
       el.querySelectorAll(":scope > span").forEach(word => {
         const ws = +word.dataset.start;
-        word.querySelectorAll("span").forEach(l => {
-          const on = kmode === "words" ? t >= ws : t >= +l.dataset.t;
-          l.classList.toggle("lit", active && on);
-        });
+        word.querySelectorAll("span").forEach(l => l.classList.toggle("lit", active && (mode === "words" ? t >= ws : t >= +l.dataset.t)));
       });
     });
   }
+  const karaoke = makeKaraoke(document.getElementById("klines"));
+  let kmode = "letters";
+  seg("kmode", b => kmode = b.dataset.mode);
+  const drawKaraoke = () => karaoke(now() % LOOP, kmode);
 
-  // ── YouTube → library demo: type, queue, download, land in the list ────
+  // ── ElevenLabs demo: no lyrics → click Sync → syncing → karaoke, on a loop ─
+  const kpanel = document.getElementById("kpanel"), kgo = document.getElementById("kgo"), kcursor = document.getElementById("kcursor"),
+        kst = ["a", "b", "c"].map(k => document.getElementById(`kst-${k}`)), ksteps = document.querySelectorAll("#ksteps li"),
+        ktime = document.getElementById("ktime");
+  const karaoke2 = makeKaraoke(document.getElementById("klines2"));
+  let kmode2 = "letters";
+  seg("kmode2", b => kmode2 = b.dataset.mode);
+  const T_CLICK = 2.2, T_DONE = 5.2, T_END = T_DONE + LOOP, K_CYCLE = T_END + 1;
+  const SEGS = [[0, T_CLICK], [T_CLICK, T_DONE], [T_DONE, T_END]];
+  const kscrub = document.getElementById("kscrub"), kbars = kscrub.querySelectorAll("i"), kfills = kscrub.querySelectorAll("b"), kknob = kscrub.querySelector(".knob");
+  let kPhase = -1, kT0 = now(), kDrag = false, kHeld = 0;
+  const clamp01 = x => Math.max(0, Math.min(1, x));
+  const ease = x => x < .5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2;
+  // Scrub: each segment maps onto its own step, so the short ones stay easy to hit.
+  function seekTo(clientX) {
+    let k = 0; kbars.forEach((b, i) => { if (clientX >= b.getBoundingClientRect().left) k = i; });
+    const r = kbars[k].getBoundingClientRect(), [a, z] = SEGS[k];
+    kHeld = a + clamp01((clientX - r.left) / r.width) * (z - a);
+    kT0 = now() - kHeld;   // a quick click may never see a frame while held
+  }
+  kscrub.addEventListener("pointerdown", ev => { kDrag = true; kscrub.classList.add("drag"); kscrub.setPointerCapture(ev.pointerId); seekTo(ev.clientX); });
+  kscrub.addEventListener("pointermove", ev => { if (kDrag) seekTo(ev.clientX); });
+  const endDrag = () => { kDrag = false; kscrub.classList.remove("drag"); };
+  kscrub.addEventListener("pointerup", endDrag); kscrub.addEventListener("pointercancel", endDrag);
+  ksteps.forEach((li, i) => li.onclick = () => kT0 = now() - SEGS[i][0] - (i ? .01 : 0));
+  function drawEleven() {
+    let e = now() - kT0;
+    if (kDrag) { e = kHeld; kT0 = now() - e; }   // hold still under the finger; resume from here on release
+    else if (e > K_CYCLE) { kT0 = now(); e = 0; }
+    const phase = e < T_CLICK ? 0 : e < T_DONE ? 1 : 2;
+    if (phase !== kPhase) {
+      kPhase = phase;
+      kst.forEach((el, i) => el.classList.toggle("on", i === phase));
+      ksteps.forEach((el, i) => el.classList.toggle("on", i === phase));
+    }
+    // the cursor: fades in, glides onto the button, clicks it — all from e, so scrubbing works
+    const p = kpanel.getBoundingClientRect(), b = kgo.getBoundingClientRect();
+    const m = ease(clamp01((e - .7) / .9)), x0 = p.width * .78, y0 = p.height * .9;
+    const x1 = b.left - p.left + b.width * .55, y1 = b.top - p.top + b.height * .45;
+    kcursor.style.left = `${x0 + (x1 - x0) * m}px`; kcursor.style.top = `${y0 + (y1 - y0) * m}px`;
+    kcursor.style.opacity = phase === 0 && e > .5 ? "1" : "0";
+    const down = e > 1.85 && e < 2.05;
+    kcursor.classList.toggle("down", down); kgo.classList.toggle("press", down);
+    // timeline
+    SEGS.forEach(([a, z], i) => kfills[i].style.width = `${clamp01((e - a) / (z - a)) * 100}%`);
+    const k = Math.min(2, phase), r = kbars[k].getBoundingClientRect(), sr = kscrub.getBoundingClientRect();
+    kknob.style.left = `${r.left - sr.left + clamp01((e - SEGS[k][0]) / (SEGS[k][1] - SEGS[k][0])) * r.width}px`;
+    ktime.textContent = fmt(24 + e);
+    karaoke2(phase === 2 ? e - T_DONE - .4 : -1, kmode2);
+  }
+
+  // ── YouTube → library demo ──────────────────────────────────────────────
   const ftxt = document.getElementById("ftxt"), fstatus = document.getElementById("fstatus"), fill = document.getElementById("fill"),
         chips = document.getElementById("dlchips"), dlrows = document.getElementById("dlrows");
   const URLS = ["youtube.com/watch?v=n30n-t1de", "youtu.be/fr1day-st4tic"], TITLES = [["Neon Tide", "Afterglow", "03:48"], ["Friday Static — Live Mix", "DJ Halcyon", "58:14"]];
@@ -801,61 +1084,68 @@
         for (let i = 0; i <= URLS[u].length; i++) { ftxt.innerHTML = `https://${URLS[u].slice(0, i)}<span class="caret"></span>`; await sleep(38); }
         await sleep(350);
         const c = document.createElement("span"); c.className = "dlchip"; c.textContent = TITLES[u][0]; chips.append(c);
-        ftxt.innerHTML = `<span style="opacity:.6">Add another…</span>`;
-        await sleep(500);
+        ftxt.innerHTML = `<span style="opacity:.6">Add another…</span>`; await sleep(500);
       }
       for (let u = 0; u < URLS.length; u++) {
         fill.style.transition = "none"; fill.style.width = "0"; await sleep(30);
         fill.style.transition = "width 2.2s cubic-bezier(.4,0,.2,1)"; fill.style.width = "100%";
         for (let p = 0; p <= 100; p += 5) { fstatus.textContent = p < 100 ? `Downloading ${p}%` : "Processing…"; await sleep(110); }
         await sleep(300);
-        const [t, a, d] = TITLES[u];
-        const row = document.createElement("div"); row.className = "row newrow";
+        const [t, a, d] = TITLES[u], row = document.createElement("div"); row.className = "row newrow";
         row.innerHTML = `<span class="note">♪</span><span><b>${t}</b><small>${a}</small></span><span class="d">${d}</span>`;
         dlrows.prepend(row); chips.firstElementChild?.remove();
       }
-      fstatus.textContent = ""; fill.style.width = "0"; ftxt.innerHTML = `<span style="opacity:.6">Paste a YouTube URL…</span>`;
+      // snap the fill away (no shrinking animation back across the field)
+      fill.style.transition = "none"; fstatus.textContent = ""; fill.style.width = "0"; ftxt.innerHTML = `<span style="opacity:.6">Paste a YouTube URL…</span>`;
       await sleep(2600);
     }
   }
 
-  // ── the header view strip opens and closes on its own in the hero ───────
+  // ── setup-guide copy buttons: the icon flips to a check for a moment ────
+  document.querySelectorAll(".copybtn").forEach(b => b.onclick = async () => {
+    try { await navigator.clipboard.writeText(b.previousElementSibling.textContent); } catch { return; }
+    b.classList.add("done"); b.title = "Copied";
+    clearTimeout(b._t); b._t = setTimeout(() => { b.classList.remove("done"); b.title = "Copy"; }, 1400);
+  });
+
+  // ── the hero's view strip opens and closes on its own ───────────────────
   const strip = document.getElementById("strip");
   if (!reduce) setInterval(() => strip.classList.toggle("open"), 2600);
 
+  // ── card spotlights follow the pointer ─────────────────────────────────
+  document.querySelectorAll(".card").forEach(c => c.addEventListener("pointermove", e => {
+    const r = c.getBoundingClientRect(); c.style.setProperty("--mx", `${e.clientX - r.left}px`); c.style.setProperty("--my", `${e.clientY - r.top}px`);
+  }));
+
   // ── entrance + scroll reveals ───────────────────────────────────────────
   requestAnimationFrame(() => document.getElementById("stage").classList.add("in"));
-  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .15 });
-  document.querySelectorAll(".reveal").forEach((el, i) => { el.style.transitionDelay = `${(i % 3) * 80}ms`; io.observe(el); });
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return;
+    const el = e.target; el.classList.add("in"); io.unobserve(el);
+    // once it has arrived, drop the stagger so hovers react instantly
+    setTimeout(() => { el.style.transitionDelay = ""; el.classList.add("done"); }, 900 + (parseFloat(el.style.transitionDelay) || 0));
+  }), { threshold: .12 });
+  document.querySelectorAll(".reveal").forEach((el, i) => { el.style.transitionDelay = `${(i % 4) * 60}ms`; io.observe(el); });
 
-  // ── latest release: version badge + direct zip link ─────────────────────
+  // ── the download buttons point straight at the latest release's zip ─────
   fetch("https://api.github.com/repos/afterglow1251/music-player-macos-Sonar/releases/latest")
     .then(r => r.ok ? r.json() : null).then(rel => {
-      if (!rel) return;
-      document.querySelectorAll(".ver").forEach(el => el.textContent = `${rel.tag_name} beta`);
-      const zip = (rel.assets || []).find(a => a.name.endsWith(".zip"));
-      if (zip) {
-        document.querySelectorAll(".dl-link").forEach(a => a.href = zip.browser_download_url);
-        document.querySelectorAll(".dl-name").forEach(c => c.textContent = zip.name);
-      }
+      const zip = rel && (rel.assets || []).find(a => a.name.endsWith(".zip"));
+      if (zip) document.querySelectorAll(".dl-link").forEach(a => a.href = zip.browser_download_url);
     }).catch(() => {});
 
-  // ── copy buttons in the setup guide ─────────────────────────────────────
-  document.querySelectorAll(".copy").forEach(b => b.onclick = async () => {
-    const text = b.previousElementSibling.textContent;
-    try { await navigator.clipboard.writeText(text); } catch { return; }
-    b.textContent = "Copied"; b.classList.add("done");
-    setTimeout(() => { b.textContent = "Copy"; b.classList.remove("done"); }, 1400);
-  });
-
-  // ── one loop drives every canvas ────────────────────────────────────────
+  // ── one loop drives everything ──────────────────────────────────────────
   let prev = now();
   function frame() {
     const t = now(), dt = t - prev; prev = t;
-    heroViz.draw(); bigViz.draw(); drawWave(dt); drawKaraoke();
+    heroViz.draw(); bigViz.draw(); waves.forEach(w => w.draw(dt)); drawKaraoke(); drawEleven();
+    document.getElementById("clock").textContent = `${pad(waves[0].pos)} / ${pad(DUR)}`;
+    document.getElementById("mnow").textContent = clockOf(Math.min(waves[2].pos, waves[2].dur));
+    document.getElementById("mdur").textContent = clockOf(waves[2].dur);
+    document.getElementById("wtime").textContent = `${clockOf(Math.min(waves[1].pos, waves[1].dur))} / ${clockOf(waves[1].dur)}`;
     requestAnimationFrame(frame);
   }
-  if (reduce) { heroViz.draw(); bigViz.draw(); drawWave(0); drawKaraoke(); }
+  if (reduce) { heroViz.draw(); bigViz.draw(); waves.forEach(w => w.draw(0)); drawKaraoke(); }
   else { requestAnimationFrame(frame); dlLoop(); }
 })();
 </script>
