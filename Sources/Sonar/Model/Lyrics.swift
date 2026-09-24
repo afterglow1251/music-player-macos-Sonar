@@ -84,6 +84,97 @@ enum LyricsProvider {
         return shifted(lines.parsed, by: subject.offset)
     }
 
+    enum ImportError: LocalizedError {
+        case unreadable
+        case download
+        case notSynced
+
+        var errorDescription: String? {
+            switch self {
+            case .unreadable: "Couldn't read that file"
+            case .download: "Couldn't download that link"
+            case .notSynced: "No timestamped lyrics there — it needs to be a synced .lrc"
+            }
+        }
+    }
+
+    /// Use a user-picked `.lrc` file as this song's lyrics — for when the LRCLIB
+    /// lookup can't find the song by name. See `install`.
+    static func importFile(_ file: URL, for subject: LyricsSubject) throws -> [LyricLine] {
+        var encoding = String.Encoding.utf8
+        guard let text = try? String(contentsOf: file, usedEncoding: &encoding) else {
+            throw ImportError.unreadable
+        }
+        return try install(text, for: subject)
+    }
+
+    /// Download synced lyrics from a user-pasted link and use them for this song.
+    /// Takes whatever the link serves: a raw `.lrc` (GitHub/Gist raw, any file
+    /// host), an LRCLIB record (its `/api/get/<id>` JSON, or an lrclib.net link
+    /// carrying the record id), or an ordinary lyrics web page — its HTML is
+    /// flattened to text and only the timestamped lines are kept.
+    static func importLink(_ link: URL, for subject: LyricsSubject) async throws -> [LyricLine] {
+        var request = URLRequest(url: resolved(link))
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 15
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200 else {
+            throw ImportError.download
+        }
+        let body = String(decoding: data, as: UTF8.self)
+        if let record = try? JSONDecoder().decode(LRCLIBRecord.self, from: data),
+           let synced = record.syncedLyrics, !synced.isEmpty {
+            return try install(synced, for: subject)
+        }
+        if !parse(body).isEmpty { return try install(body, for: subject) }
+        return try install(plainText(fromHTML: body), for: subject)
+    }
+
+    /// Where to actually fetch a pasted link from: a GitHub file page → its raw
+    /// file, and an lrclib.net link with a record id → that record's JSON.
+    private static func resolved(_ link: URL) -> URL {
+        let host = link.host()?.lowercased() ?? ""
+        if host == "github.com", link.pathComponents.count > 4, link.pathComponents[3] == "blob" {
+            // /<owner>/<repo>/blob/<ref>/<path…> → raw.githubusercontent.com/<owner>/<repo>/<ref>/<path…>
+            var parts = link.pathComponents.dropFirst()   // drop the leading "/"
+            parts.remove(at: parts.startIndex + 2)         // drop "blob"
+            return URL(string: "https://raw.githubusercontent.com/" + parts.joined(separator: "/")) ?? link
+        }
+        if host.hasSuffix("lrclib.net"), !link.path().hasPrefix("/api/"),
+           let id = link.pathComponents.last(where: { Int($0) != nil }) {
+            return URL(string: "https://lrclib.net/api/get/\(id)") ?? link
+        }
+        return link
+    }
+
+    /// Flatten an HTML page to plain text — line breaks kept, tags dropped, the
+    /// common entities decoded — so LRC lines shown on a web page parse as usual.
+    private static func plainText(fromHTML html: String) -> String {
+        var text = html.replacing(htmlBreakRegex, with: "\n").replacing(htmlTagRegex, with: "")
+        for (entity, char) in ["&amp;": "&", "&quot;": "\"", "&#39;": "'", "&apos;": "'",
+                               "&lt;": "<", "&gt;": ">", "&nbsp;": " "] {
+            text = text.replacingOccurrences(of: entity, with: char)
+        }
+        return text
+    }
+
+    nonisolated(unsafe) private static let htmlBreakRegex = /(?i)<br\s*\/?>|<\/(?:p|div|li|span)>/
+    nonisolated(unsafe) private static let htmlTagRegex = /<[^>]+>/
+
+    /// Copy user-supplied LRC text into the song's cache slot, so from then on it
+    /// loads exactly like a downloaded lyric (instantly, offline) and the song
+    /// never hits the name lookup again. Rejects text with no timestamps rather
+    /// than caching lyrics that could never highlight.
+    private static func install(_ text: String, for subject: LyricsSubject) throws -> [LyricLine] {
+        let lines = parse(text)
+        guard !lines.isEmpty else { throw ImportError.notSynced }
+        let url = cacheURL(for: subject)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        try text.write(to: url, atomically: true, encoding: .utf8)
+        return shifted(lines, by: subject.offset)
+    }
+
     /// Move every timestamp later by `offset` — an LRC counts from the song's own
     /// start, but a chapter's song starts partway into the file.
     private static func shifted(_ lines: [LyricLine], by offset: TimeInterval) -> [LyricLine] {
@@ -348,11 +439,12 @@ enum LyricsProvider {
     // a punctuation joiner (× & , ; / +). Normalized to a single space for search.
     nonisolated(unsafe) private static let artistSepRegex = /(?i)(?:\s+(?:x|vs|and)\b\.?|[×&,;\/+])\s*/
 
+    private static let userAgent = "Sonar (macOS music player; github.com/afterglow1251/music-player-macos)"
+
     /// Shared GET → decode helper (UA header, 200-only, best-effort).
     private static func get<T: Decodable>(_ url: URL) async -> T? {
         var request = URLRequest(url: url)
-        request.setValue("Sonar (macOS music player; github.com/afterglow1251/music-player-macos)",
-                         forHTTPHeaderField: "User-Agent")
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 12
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200,

@@ -67,6 +67,9 @@ struct PlayerWindow: View {
     @FocusState var urlFieldFocused: Bool
     @FocusState var searchFieldFocused: Bool
     @FocusState var renameFieldFocused: Bool
+    /// Some text field is being typed in (any `SteadyTextField`, via
+    /// `TextInputFocusKey`) — the bare-key shortcuts stand down so keys edit text.
+    @State var isTypingInField = false
 
     /// Accent — the signature green, used sparingly.
     let accent = Theme.accent
@@ -100,6 +103,7 @@ struct PlayerWindow: View {
         // Fill the window (the single column stays centred in it) so the reader
         // below measures the window's content area, not the fixed-width column.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onPreferenceChange(TextInputFocusKey.self) { isTypingInField = $0 }
         .background(GeometryReader { proxy in
             Color.clear
                 .onAppear { isWideWindow = Self.fitsWideLayout(proxy.size) }
@@ -134,7 +138,8 @@ struct PlayerWindow: View {
                 trackSelection.selection.removeAll()          // clear the whole multi-selection
                 trackSelection.selectionIsExplicit = false
                 return true
-            } else if urlFieldFocused || searchFieldFocused {
+            } else if isTypingInField && !renameFieldFocused {
+                // (The rename field keeps Esc for itself — it cancels the rename.)
                 dismissFocus()
                 return true
             }
@@ -255,7 +260,7 @@ struct PlayerWindow: View {
         // ←/→ seek ±10s; ⌘↑/↓ volume. The list is the default owner of the bare
         // arrows — no focus mode to enter or a cursor to re-acquire.
         .background {
-            if !urlFieldFocused && !searchFieldFocused && !renameFieldFocused {
+            if !isTypingInField {
                 Group {
                     Button("") { controller.seekBy(-10) }.keyboardShortcut(.leftArrow, modifiers: [])
                     Button("") { controller.seekBy(10) }.keyboardShortcut(.rightArrow, modifiers: [])
@@ -321,6 +326,8 @@ struct PlayerWindow: View {
     func dismissFocus() {
         urlFieldFocused = false
         searchFieldFocused = false
+        // Fields that track their own focus (lyrics link, sleep minutes) let go too.
+        NSApp.keyWindow?.makeFirstResponder(nil)
     }
 
     private func decodeArtwork(_ track: Track?) {

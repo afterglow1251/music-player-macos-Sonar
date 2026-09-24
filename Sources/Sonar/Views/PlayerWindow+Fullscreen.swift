@@ -61,7 +61,7 @@ extension PlayerWindow {
         // ←/→ seek ±10s, ⌘↑/↓ volume, ↑/↓ walk the track-list cursor + ↩ plays it
         // (space is handled by the play button itself).
         .background {
-            if !urlFieldFocused && !searchFieldFocused && !renameFieldFocused {
+            if !isTypingInField {
                 Group {
                     Button("") { controller.seekBy(-10) }.keyboardShortcut(.leftArrow, modifiers: [])
                     Button("") { controller.seekBy(10) }.keyboardShortcut(.rightArrow, modifiers: [])
