@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonar — a music player for macOS</title>
+<meta name="description" content="Sonar is a native macOS music player with a real-time visualizer, letter-by-letter karaoke and YouTube downloads.">
+<meta property="og:title" content="Sonar — a music player for macOS">
+<meta property="og:description" content="A real-time visualizer, letter-by-letter karaoke and YouTube downloads, in one native Mac app.">
+<meta name="theme-color" content="#08090b">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317171a'/%3E%3Cg fill='none' stroke-width='3.2'%3E%3Ccircle cx='32' cy='32' r='22' stroke='%23d429bd'/%3E%3Ccircle cx='32' cy='32' r='15' stroke='%239a9ea3'/%3E%3Ccircle cx='32' cy='32' r='8' stroke='%2366db70'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #08090b;
+    --bg-2: #0e1013;
+    --panel: #121418;
+    --line: rgba(255,255,255,.08);
+    --text: #eef0f2;
+    --muted: #9aa0a8;
+    --dim: #5d636b;
+    --accent: #4ade6b;
+    --accent-deep: #1f8a3a;
+    --magenta: #d429bd;
+    --pink: #ff5a73;
+    --radius: 18px;
+    --display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    --body: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 var(--body);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  .wrap { width: min(1180px, 100% - 32px); margin-inline: auto; }
+  .mono { font-family: var(--mono); }
+  .eyebrow {
+    font: 700 11px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  /* ── ambient glow behind everything ─────────────────────────── */
+  .aurora {
+    position: fixed; inset: -20vh -10vw auto; height: 90vh; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(40% 50% at 25% 30%, rgba(74,222,107,.16), transparent 70%),
+      radial-gradient(35% 45% at 78% 22%, rgba(212,41,189,.16), transparent 70%),
+      radial-gradient(30% 40% at 55% 70%, rgba(56,120,255,.08), transparent 70%);
+    filter: blur(20px);
+    animation: drift 18s ease-in-out infinite alternate;
+  }
+  @keyframes drift { to { transform: translate3d(0, 4vh, 0) scale(1.08); } }
+
+  /* ── nav ─────────────────────────────────────────────────────── */
+  nav {
+    position: sticky; top: 0; z-index: 20;
+    backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    background: rgba(8,9,11,.55); border-bottom: 1px solid var(--line);
+  }
+  nav .wrap { display: flex; align-items: center; gap: 28px; height: 64px; }
+  .brand { display: flex; align-items: center; gap: 10px; font: 700 19px var(--display); letter-spacing: -.01em; }
+  .brand svg { width: 30px; height: 30px; }
+  nav .links { display: flex; gap: 24px; margin-left: auto; font-size: 14px; color: var(--muted); }
+  nav .links a:hover { color: var(--text); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    font: 600 15px var(--body); border-radius: 999px; padding: 12px 22px;
+    transition: transform .2s cubic-bezier(.2,.8,.2,1.4), box-shadow .2s, background .2s;
+    white-space: nowrap;
+  }
+  .btn:hover { transform: translateY(-2px) scale(1.02); }
+  .btn:active { transform: scale(.97); }
+  .btn-primary {
+    background: var(--accent); color: #04130a;
+    box-shadow: 0 10px 40px -10px rgba(74,222,107,.7), inset 0 1px 0 rgba(255,255,255,.35);
+  }
+  .btn-primary:hover { box-shadow: 0 16px 50px -10px rgba(74,222,107,.9), inset 0 1px 0 rgba(255,255,255,.35); }
+  .btn-ghost { background: rgba(255,255,255,.06); border: 1px solid var(--line); }
+  .btn-ghost:hover { background: rgba(255,255,255,.1); }
+  nav .btn { padding: 9px 16px; font-size: 13px; }
+
+  /* ── hero ────────────────────────────────────────────────────── */
+  .hero { padding: 96px 0 40px; text-align: center; }
+  .hero .eyebrow { display: inline-flex; gap: 10px; align-items: center; padding: 8px 14px; border-radius: 999px;
+    background: rgba(74,222,107,.08); border: 1px solid rgba(74,222,107,.25); }
+  .hero .eyebrow i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: blink 1.6s infinite; }
+  @keyframes blink { 50% { opacity: .3; } }
+  h1 {
+    font: 700 clamp(46px, 8.4vw, 104px)/.95 var(--display); letter-spacing: -.045em;
+    margin: 26px auto 22px; max-width: 12ch;
+  }
+  h1 .lit {
+    background: linear-gradient(92deg, var(--accent) 0%, #b7f26b 35%, #f5d547 55%, var(--magenta) 100%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: sweep 6s ease-in-out infinite alternate;
+  }
+  @keyframes sweep { to { background-position: 100% 0; } }
+  .hero p.lead { font-size: clamp(17px, 2vw, 20px); color: var(--muted); max-width: 620px; margin: 0 auto 36px; }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .meta { margin-top: 18px; font: 500 12px var(--mono); color: var(--dim); letter-spacing: .04em; }
+
+  /* ── the mock player window ─────────────────────────────────── */
+  .stage { position: relative; margin: 72px auto 0; width: min(980px, 100%); perspective: 1600px; }
+  .stage::before {
+    content: ""; position: absolute; inset: 8% 6% -6%; z-index: -1; border-radius: 40px;
+    background: radial-gradient(60% 60% at 30% 40%, rgba(74,222,107,.35), transparent 70%),
+                radial-gradient(50% 60% at 75% 60%, rgba(212,41,189,.35), transparent 70%);
+    filter: blur(60px); opacity: .8;
+  }
+  .window {
+    border-radius: 16px; overflow: hidden; text-align: left;
+    background: linear-gradient(180deg, #16181c, #0b0c0f);
+    border: 1px solid rgba(255,255,255,.1);
+    box-shadow: 0 50px 120px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(0,0,0,.6);
+    transform: rotateX(8deg) translateY(10px);
+    transition: transform .8s cubic-bezier(.2,.8,.2,1);
+  }
+  .stage.in .window { transform: rotateX(0) translateY(0); }
+  .titlebar { height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: rgba(255,255,255,.03); border-bottom: 1px solid var(--line); }
+  .titlebar i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+  .titlebar i:nth-child(2) { background: #febc2e; }
+  .titlebar i:nth-child(3) { background: #28c840; }
+  .app { position: relative; display: grid; grid-template-columns: 1.05fr 1fr; gap: 28px; padding: 26px; isolation: isolate; }
+  .app::before { /* blurred-cover backdrop, like the real app */
+    content: ""; position: absolute; inset: 0; z-index: -1;
+    background: radial-gradient(50% 60% at 20% 20%, rgba(212,41,189,.28), transparent 70%),
+                radial-gradient(50% 60% at 70% 30%, rgba(56,120,255,.18), transparent 70%),
+                linear-gradient(180deg, rgba(0,0,0,.1), rgba(0,0,0,.55));
+  }
+  .left { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .cover {
+    position: relative; aspect-ratio: 1; border-radius: 14px; overflow: hidden;
+    background: #1b0f24;
+    box-shadow: 0 20px 50px -20px rgba(0,0,0,.9);
+    animation: breathe 1.2s ease-in-out infinite;
+  }
+  @keyframes breathe { 50% { transform: scale(1.012); } }
+  .cover .blob { position: absolute; border-radius: 50%; filter: blur(28px); mix-blend-mode: screen; }
+  .cover .b1 { width: 70%; height: 70%; left: -10%; top: -5%; background: #d429bd; animation: orbit 9s linear infinite; }
+  .cover .b2 { width: 60%; height: 60%; right: -12%; top: 20%; background: #3b6cff; animation: orbit 11s linear infinite reverse; }
+  .cover .b3 { width: 55%; height: 55%; left: 20%; bottom: -18%; background: #4ade6b; animation: orbit 13s linear infinite; }
+  @keyframes orbit { from { transform: rotate(0) translateX(8%) rotate(0); } to { transform: rotate(360deg) translateX(8%) rotate(-360deg); } }
+  .cover .grain { position: absolute; inset: 0; opacity: .18; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  .cover .art-title { position: absolute; left: 22px; bottom: 18px; font: 700 clamp(26px, 4vw, 44px)/.9 var(--display); letter-spacing: -.04em; text-transform: uppercase; }
+  .cover .art-title small { display: block; font: 700 11px var(--mono); letter-spacing: .3em; opacity: .75; margin-bottom: 8px; }
+  .cover .pills { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; }
+  .cover .pills span { width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.45); display: grid; place-items: center; }
+  .cover .pills svg { width: 14px; height: 14px; }
+  .nowplaying { display: flex; justify-content: space-between; align-items: end; gap: 10px; }
+  .nowplaying .src { font: 600 11px var(--body); color: var(--dim); display: flex; gap: 6px; align-items: center; }
+  .nowplaying .src b { color: var(--muted); font-weight: 600; }
+  .nowplaying .src i { display: inline-flex; gap: 1.5px; align-items: end; height: 9px; }
+  .nowplaying .src i u { width: 2px; background: var(--magenta); animation: eq .7s ease-in-out infinite alternate; text-decoration: none; }
+  .nowplaying .src i u:nth-child(2) { animation-delay: -.3s; }
+  .nowplaying .src i u:nth-child(3) { animation-delay: -.5s; }
+  @keyframes eq { from { height: 2px; } to { height: 9px; } }
+  .nowplaying h4 { font: 700 18px var(--body); margin-top: 3px; }
+  .nowplaying p { font-size: 13px; color: var(--muted); }
+  .nowplaying .time { font: 700 13px var(--mono); color: var(--accent); white-space: nowrap; }
+  canvas { display: block; width: 100%; }
+  #viz { height: 70px; }
+  #wave { height: 34px; cursor: pointer; }
+  .wavewrap { position: relative; }
+  .wavewrap .tip {
+    position: absolute; top: -30px; transform: translateX(-50%); pointer-events: none;
+    font: 600 11px var(--body); background: #292b2f; padding: 4px 8px; border-radius: 6px;
+    box-shadow: 0 6px 16px rgba(0,0,0,.5); opacity: 0; transition: opacity .15s;
+  }
+  .wavewrap:hover .tip { opacity: 1; }
+  .transport { display: flex; justify-content: center; align-items: center; gap: 26px; margin-top: 2px; }
+  .transport svg { width: 18px; height: 18px; fill: var(--text); opacity: .9; }
+  .transport .play { width: 50px; height: 50px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; box-shadow: 0 10px 30px -8px rgba(74,222,107,.8); }
+  .transport .play svg { fill: #06170c; width: 20px; height: 20px; }
+  .right { border: 1px solid var(--line); border-radius: 14px; background: rgba(10,11,14,.55); padding: 14px 10px; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .app .right { height: 0; min-height: 100%; }   /* the list follows the left column, never stretches it */
+  .app .rows { overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 85%, transparent); mask-image: linear-gradient(180deg, #000 85%, transparent); }
+  .libhead { display: flex; align-items: center; gap: 8px; padding: 0 6px 10px; font: 700 10px var(--mono); color: var(--dim); letter-spacing: .08em; }
+  .libhead .n { color: #484d54; }
+  .libhead .icons { margin-left: auto; display: flex; gap: 14px; align-items: center; }
+  .libhead svg { width: 14px; height: 14px; stroke: #8b9098; }
+  .strip { display: flex; align-items: center; gap: 2px; border-radius: 999px; padding: 0; transition: background .25s, padding .25s; }
+  .strip .opt { width: 0; opacity: 0; transform: scale(.4) translateX(10px); transition: all .34s cubic-bezier(.2,.9,.2,1.25); overflow: hidden; display: grid; place-items: center; height: 22px; }
+  .strip.open { background: rgba(255,255,255,.06); padding: 0 4px; }
+  .strip.open .opt { width: 22px; opacity: 1; transform: none; }
+  .strip .div { width: 0; height: 12px; background: rgba(255,255,255,.15); transition: all .3s; }
+  .strip.open .div { width: 1px; margin: 0 3px; }
+  .strip .anchor { transition: opacity .2s, width .3s; width: 14px; }
+  .strip.open .anchor { opacity: 0; width: 0; }   /* like the app: the icon becomes the strip */
+  .strip .opt.on svg { stroke: var(--accent); }
+  .strip .opt.fav svg { stroke: var(--pink); }
+  .chips { display: flex; gap: 6px; padding: 0 6px 10px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+  .chip { font: 600 11px var(--body); padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.07); color: var(--muted); }
+  .chip.on { background: var(--accent); color: #06170c; }
+  .rows { display: flex; flex-direction: column; gap: 2px; }
+  .row { display: grid; grid-template-columns: 18px 1fr auto; gap: 10px; align-items: center; padding: 7px 8px; border-radius: 9px; font-size: 13px; }
+  .row b { font-weight: 500; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row small { color: var(--dim); font-size: 11px; }
+  .row .d { font: 500 11px var(--mono); color: var(--dim); }
+  .row .note { color: #6b7078; font-size: 12px; }
+  .row.now { background: rgba(74,222,107,.14); }
+  .row.now .note { display: inline-flex; gap: 1.5px; align-items: end; height: 11px; }
+  .row.now .note u { width: 2px; background: var(--accent); animation: eq .6s ease-in-out infinite alternate; }
+  .row.now .note u:nth-child(2) { animation-delay: -.25s; }
+  .row.now .note u:nth-child(3) { animation-delay: -.45s; }
+  .row .fav { color: var(--pink); }
+
+  /* ── sections ────────────────────────────────────────────────── */
+  section { padding: 120px 0; }
+  .sec-head { max-width: 640px; margin-bottom: 56px; }
+  h2 { font: 700 clamp(34px, 5vw, 58px)/1 var(--display); letter-spacing: -.035em; margin: 16px 0 18px; }
+  .sec-head p { color: var(--muted); font-size: 18px; }
+  .reveal { opacity: 0; transform: translateY(28px); transition: opacity .9s ease, transform .9s cubic-bezier(.2,.8,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  .split { display: grid; grid-template-columns: 1fr 1.1fr; gap: 64px; align-items: center; }
+  .split.flip { grid-template-columns: 1.1fr 1fr; }
+  .split.flip .copy { order: 2; }
+  .copy ul { list-style: none; display: grid; gap: 14px; margin-top: 28px; }
+  .copy li { display: grid; grid-template-columns: 22px 1fr; gap: 12px; color: var(--muted); }
+  .copy li b { color: var(--text); font-weight: 600; }
+  .copy li::before { content: ""; width: 8px; height: 8px; margin-top: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .card {
+    position: relative; border-radius: var(--radius); background: linear-gradient(180deg, #111317, #0a0b0d);
+    border: 1px solid var(--line); padding: 26px; overflow: hidden;
+  }
+  .card::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+    background: radial-gradient(60% 50% at 50% 0%, rgba(255,255,255,.06), transparent 70%); }
+
+  /* visualizer showcase */
+  #bigviz { height: 300px; }
+  .modes { display: flex; gap: 6px; margin-top: 18px; }
+  .modes button, .seg button {
+    font: 600 12px var(--body); color: var(--muted); background: rgba(255,255,255,.05);
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer; transition: all .2s;
+  }
+  .modes button:hover, .seg button:hover { color: var(--text); }
+  .modes button.on, .seg button.on { color: #06170c; background: var(--accent); border-color: var(--accent); }
+  .themes { display: flex; gap: 8px; margin-left: auto; }
+  .themes i { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform .2s; }
+  .themes i:hover { transform: scale(1.15); }
+  .themes i.on { border-color: #fff; }
+
+  /* karaoke showcase */
+  .karaoke { min-height: 360px; display: flex; flex-direction: column; justify-content: center; }
+  .klines { display: grid; gap: 14px; font: 600 clamp(20px, 2.6vw, 30px)/1.25 var(--body); letter-spacing: -.01em; }
+  .kline { color: rgba(255,255,255,.28); transition: color .3s, transform .4s cubic-bezier(.2,.8,.2,1), opacity .3s; transform-origin: left center; }
+  .kline.active { color: rgba(255,255,255,.92); transform: scale(1.06); }
+  .kline .lit { color: var(--accent); text-shadow: 0 0 22px rgba(74,222,107,.45); }
+  .kbar { display: flex; align-items: center; gap: 12px; margin-top: 30px; }
+  .seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(0,0,0,.35); border: 1px solid var(--line); }
+  .seg button { border: 0; background: transparent; }
+  .kbar .hint { font: 500 12px var(--mono); color: var(--dim); }
+
+  /* downloads showcase */
+  .dl { display: grid; gap: 14px; }
+  .field {
+    position: relative; display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 999px;
+    background: rgba(255,255,255,.07); overflow: hidden; font-size: 15px;
+  }
+  .field .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(74,222,107,.22); border-radius: inherit; }
+  .field .txt { position: relative; flex: 1; color: var(--muted); white-space: nowrap; overflow: hidden; }
+  .field .txt .caret { display: inline-block; width: 1.5px; height: 1.1em; background: var(--text); vertical-align: -3px; margin-left: 1px; animation: blink 1s steps(1) infinite; }
+  .field .status { position: relative; font: 500 13px var(--body); color: var(--text); opacity: .75; }
+  .field svg { position: relative; width: 22px; height: 22px; flex: none; }
+  .dlchips { display: flex; gap: 8px; min-height: 28px; flex-wrap: wrap; }
+  .dlchip { font: 600 12px var(--body); padding: 5px 12px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--muted);
+    animation: pop .45s cubic-bezier(.2,.9,.2,1.4) both; }
+  @keyframes pop { from { opacity: 0; transform: scale(.6); } }
+  .newrow { animation: slidein .6s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes slidein { from { opacity: 0; transform: translateY(-8px); background: rgba(74,222,107,.3); } }
+
+  /* grid of smaller features */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .feat { padding: 26px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); transition: transform .3s cubic-bezier(.2,.8,.2,1), border-color .3s; }
+  .feat:hover { transform: translateY(-4px); border-color: rgba(74,222,107,.35); }
+  .feat .ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: rgba(74,222,107,.1); margin-bottom: 18px; }
+  .feat .ic svg { width: 20px; height: 20px; stroke: var(--accent); }
+  .feat h3 { font: 600 18px var(--display); margin-bottom: 6px; letter-spacing: -.01em; }
+  .feat p { color: var(--muted); font-size: 14.5px; }
+
+  /* install */
+  .install { text-align: center; }
+  .install h2 { margin-inline: auto; max-width: 14ch; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 48px 0 40px; text-align: left; }
+  .step { padding: 24px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
+  .step .num { font: 700 12px var(--mono); color: var(--accent); }
+  .step h3 { font: 600 17px var(--display); margin: 10px 0 6px; }
+  .step p { color: var(--muted); font-size: 14px; }
+  .step code { font: 500 12.5px var(--mono); background: rgba(255,255,255,.07); padding: 2px 6px; border-radius: 5px; color: var(--text); }
+  .req { margin-top: 18px; font-size: 13px; color: var(--dim); }
+
+  footer { border-top: 1px solid var(--line); padding: 36px 0 60px; color: var(--dim); font-size: 13px; }
+  footer .wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  footer .links { margin-left: auto; display: flex; gap: 20px; }
+  footer a:hover { color: var(--text); }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .right { display: none; }
+    .split, .split.flip { grid-template-columns: 1fr; gap: 36px; }
+    .split.flip .copy { order: 0; }
+    .grid, .steps { grid-template-columns: 1fr; }
+    nav .links { display: none; }
+    section { padding: 80px 0; }
+    #bigviz { height: 220px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .reveal { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="aurora"></div>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#66db70"/><stop offset=".5" stop-color="#9a9ea3"/><stop offset="1" stop-color="#d429bd"/></linearGradient></defs>
+        <rect width="64" height="64" rx="15" fill="#17171a"/>
+        <g fill="none" stroke="url(#rg)" stroke-width="3.4"><circle cx="32" cy="32" r="22"/><circle cx="32" cy="32" r="15"/><circle cx="32" cy="32" r="8"/></g>
+      </svg>
+      Sonar
+    </a>
+    <div class="links">
+      <a href="#visualizer">Visualizer</a>
+      <a href="#karaoke">Karaoke</a>
+      <a href="#downloads">Downloads</a>
+      <a href="#features">Features</a>
+    </div>
+    <a class="btn btn-primary" href="#download">Download</a>
+  </div>
+</nav>
+
+<header class="hero wrap" id="top">
+  <span class="eyebrow"><i></i> Free for macOS · <span class="ver">beta</span></span>
+  <h1>Your music, <span class="lit">lit&nbsp;up.</span></h1>
+  <p class="lead">Sonar is a native Mac music player with a real-time visualizer, karaoke that lights every letter as it's sung, and YouTube downloads straight into your library.</p>
+  <div class="cta">
+    <a class="btn btn-primary dl-link" href="https://github.com/afterglow1251/music-player-macos-Sonar/releases/latest">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.8-1.7 0-3.3 1-4.2 2.5-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.3.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9-.1 0-2.8-1-2.8-4.2zM13.9 5.1c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.1.1 2.3-.6 3-1.5z"/></svg>
+      Download for macOS
+    </a>
+    <a class="btn btn-ghost" href="https://github.com/afterglow1251/music-player-macos-Sonar">View on GitHub</a>
+  </div>
+  <p class="meta">macOS 14+ · Apple silicon · open source, MIT</p>
+
+  <div class="stage" id="stage">
+    <div class="window">
+      <div class="titlebar"><i></i><i></i><i></i></div>
+      <div class="app">
+        <div class="left">
+          <div class="cover">
+            <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+            <span class="grain"></span>
+            <div class="pills">
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="#4ade6b" stroke-width="2"><path d="M4 5h16v11H9l-5 4z"/></svg></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></span>
+            </div>
+            <div class="art-title"><small>SONAR · DEMO</small>Neon<br>Tide</div>
+          </div>
+          <div class="nowplaying">
+            <div>
+              <div class="src"><i><u></u><u></u><u></u></i> Playing from <b>Library</b></div>
+              <h4>Neon Tide</h4>
+              <p>Afterglow</p>
+            </div>
+            <div class="time" id="clock">01:12 / 03:48</div>
+          </div>
+          <canvas id="viz"></canvas>
+          <div class="wavewrap"><canvas id="wave"></canvas><span class="tip" id="tip">0:00</span></div>
+          <div class="transport">
+            <svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM9.5 12 19 5v14z"/></svg>
+            <span class="play"><svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg></span>
+            <svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM5 5l9.5 7L5 19z"/></svg>
+          </div>
+        </div>
+        <div class="right">
+          <div class="libhead">LIBRARY <span class="n">128</span>
+            <div class="icons">
+              <div class="strip" id="strip">
+                <span class="opt fav"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span>
+                <span class="div"></span>
+                <span class="opt"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3"/></svg></span>
+                <span class="opt on"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></span>
+                <span class="opt"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 18 8 6l4 12M5.5 14h5M15 13a3 3 0 1 1 3 3h-3v-6"/></svg></span>
+                <span class="opt"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span>
+                <svg class="anchor" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
+              </div>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 7h6l2 2h10v10H3z"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg>
+            </div>
+          </div>
+          <div class="chips"><span class="chip on">♪ Library</span><span class="chip">Late night</span><span class="chip">Gym</span><span class="chip">Road trip</span></div>
+          <div class="rows" id="rows">
+            <div class="row"><span class="note">♪</span><span><b>Midnight Circuit</b><small>Lumen Park</small></span><span class="d">03:21</span></div>
+            <div class="row now"><span class="note"><u></u><u></u><u></u></span><span><b>Neon Tide</b><small>Afterglow</small></span><span class="d">03:48</span></div>
+            <div class="row"><span class="note fav">♪</span><span><b>Paper Satellites</b><small>Kite Theory</small></span><span class="d">04:02</span></div>
+            <div class="row"><span class="note">♪</span><span><b>Glass Horizon</b><small>Nova Arcade</small></span><span class="d">02:57</span></div>
+            <div class="row"><span class="note">♪</span><span><b>Friday Static — Live Mix</b><small>DJ Halcyon</small></span><span class="d">58:14</span></div>
+            <div class="row"><span class="note fav">♪</span><span><b>Slow Motion Summer</b><small>The Driftwoods</small></span><span class="d">03:35</span></div>
+            <div class="row"><span class="note">♪</span><span><b>Violet Hour</b><small>Mira Lane</small></span><span class="d">03:10</span></div>
+            <div class="row"><span class="note">♪</span><span><b>Afterimage</b><small>Lumen Park</small></span><span class="d">03:44</span></div>
+            <div class="row"><span class="note fav">♪</span><span><b>Coastline Radio</b><small>Kite Theory</small></span><span class="d">02:49</span></div>
+            <div class="row"><span class="note">♪</span><span><b>Night Bus Home</b><small>The Driftwoods</small></span><span class="d">03:27</span></div>
+            <div class="row"><span class="note">♪</span><span><b>Sunday Sessions Vol. 3</b><small>DJ Halcyon</small></span><span class="d">1:12:40</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── visualizer ──────────────────────────────────────────────── -->
+<section id="visualizer">
+  <div class="wrap split">
+    <div class="copy reveal">
+      <span class="eyebrow">Visualizer</span>
+      <h2>See the song, not just hear it.</h2>
+      <p class="sec-p" style="color:var(--muted);font-size:18px">A real FFT on the audio you're playing, drawn as the classic stacked tiles with peaks that fall under gravity. Winamp spirit, rebuilt natively.</p>
+      <ul>
+        <li><span><b>Three modes.</b> Spectrum, oscilloscope and Bloom, a MilkDrop-style kaleidoscope. Double-click to flip.</span></li>
+        <li><span><b>Ten themes</b>, or one that takes its colours from the album art.</span></li>
+        <li><span><b>Artwork that breathes</b> with the bass, over a backdrop tinted by the cover.</span></li>
+      </ul>
+    </div>
+    <div class="card reveal">
+      <canvas id="bigviz"></canvas>
+      <div class="modes">
+        <button class="on" data-mode="spectrum">Spectrum</button>
+        <button data-mode="scope">Oscilloscope</button>
+        <button data-mode="bloom">Bloom</button>
+        <div class="themes" id="themes"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── karaoke ─────────────────────────────────────────────────── -->
+<section id="karaoke">
+  <div class="wrap split flip">
+    <div class="copy reveal">
+      <span class="eyebrow">Karaoke</span>
+      <h2>Every letter, right on the beat.</h2>
+      <p style="color:var(--muted);font-size:18px">Synced lyrics show up on their own. One click times them word by word, down to the letter a singer holds, so the fill follows the voice, not a guess.</p>
+      <ul>
+        <li><span><b>Lyrics found automatically</b> from LRCLIB, and cached next to the song so they work offline.</span></li>
+        <li><span><b>Timed to the letter</b> with ElevenLabs: about a cent per song, with your own key.</span></li>
+        <li><span><b>Wrong song? Paste a link</b> or drop in an <span class="mono">.lrc</span> file instead.</span></li>
+        <li><span><b>DJ mixes too:</b> each chapter of a mix gets its own lyrics.</span></li>
+      </ul>
+    </div>
+    <div class="card karaoke reveal">
+      <div class="klines" id="klines"></div>
+      <div class="kbar">
+        <div class="seg" id="kmode"><button data-mode="words">Words</button><button class="on" data-mode="letters">Letters</button></div>
+        <span class="hint">try both</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── downloads ───────────────────────────────────────────────── -->
+<section id="downloads">
+  <div class="wrap split">
+    <div class="copy reveal">
+      <span class="eyebrow">YouTube → Library</span>
+      <h2>Paste a link. It's yours.</h2>
+      <p style="color:var(--muted);font-size:18px">Drop a YouTube URL into Sonar and it lands in your library as a proper track, with cover art and tags. Queue a few more while it works.</p>
+      <ul>
+        <li><span><b>Queue as many as you like:</b> paste, press space, paste the next.</span></li>
+        <li><span><b>Long mixes keep their chapters</b>, so the seek bar shows every track in the set.</span></li>
+        <li><span><b>Drag and drop</b> audio files or links onto the window.</span></li>
+      </ul>
+    </div>
+    <div class="card reveal">
+      <div class="dl">
+        <div class="field" id="field">
+          <span class="fill" id="fill"></span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="2"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+          <span class="txt" id="ftxt"></span>
+          <span class="status" id="fstatus"></span>
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#4ade6b"/><path d="M12 7v9M8 12.5l4 4 4-4" stroke="#06170c" stroke-width="2.2" fill="none"/></svg>
+        </div>
+        <div class="dlchips" id="dlchips"></div>
+        <div class="right" style="display:flex;margin-top:6px">
+          <div class="rows" id="dlrows">
+            <div class="row"><span class="note">♪</span><span><b>Midnight Circuit</b><small>Lumen Park</small></span><span class="d">03:21</span></div>
+            <div class="row"><span class="note">♪</span><span><b>Glass Horizon</b><small>Nova Arcade</small></span><span class="d">02:57</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── feature grid ────────────────────────────────────────────── -->
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">And the rest</span>
+      <h2>Built like a Mac app should be.</h2>
+      <p>Native SwiftUI and Accelerate, no web views. Small, fast, and quiet on your battery.</p>
+    </div>
+    <div class="grid">
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 7v10M21 12h0"/></svg></div><h3>Waveform seek bar</h3><p>The song's real shape. Scrub with a drag or a swipe, and hover to see the time.</p></div>
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18"/></svg></div><h3>Menu bar mini player</h3><p>Play, skip and seek from the menu bar, even over full-screen apps.</p></div>
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></div><h3>10-band equalizer</h3><p>Presets or your own curve, previewed live on the visualizer.</p></div>
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="3" width="8" height="18" rx="2"/><rect x="13" y="3" width="8" height="18" rx="2"/></svg></div><h3>Two columns when it fits</h3><p>Full screen or a big window spreads out into now playing plus library.</p></div>
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></div><h3>Playlists and favorites</h3><p>Hand-made playlists, a favorites filter and multi-select for bulk edits.</p></div>
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z"/></svg></div><h3>Sleep timer</h3><p>Stop after 15 to 60 minutes, a custom time, or at the end of the track.</p></div>
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M7 14h10"/></svg></div><h3>Keyboard-first</h3><p>Media keys, Now Playing in Control Center, and shortcuts for everything.</p></div>
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/></svg></div><h3>Picks up where you left off</h3><p>Same track, same second, every time you open it.</p></div>
+      <div class="feat reveal"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><h3>Plays what you have</h3><p>MP3, M4A, WAV, AIFF and FLAC, straight from a folder you choose.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── download ────────────────────────────────────────────────── -->
+<section id="download" class="install">
+  <div class="wrap">
+    <span class="eyebrow reveal">Get Sonar</span>
+    <h2 class="reveal">Free. Open source. Yours.</h2>
+    <div class="steps">
+      <div class="step reveal"><span class="num">01</span><h3>Download</h3><p>Grab <code class="dl-name">Sonar.zip</code> from the latest release and unzip it.</p></div>
+      <div class="step reveal"><span class="num">02</span><h3>Move to Applications</h3><p>Drag <code>Sonar.app</code> into your Applications folder.</p></div>
+      <div class="step reveal"><span class="num">03</span><h3>First launch</h3><p>It's a beta that isn't notarized yet, so <b>right-click → Open</b> the first time. On macOS 15+, use <b>Open Anyway</b> in Privacy &amp; Security.</p></div>
+    </div>
+    <a class="btn btn-primary dl-link reveal" href="https://github.com/afterglow1251/music-player-macos-Sonar/releases/latest">Download for macOS</a>
+    <p class="req reveal">macOS 14 Sonoma or later, Apple silicon. YouTube downloads need <span class="mono">brew install yt-dlp ffmpeg</span>.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span class="brand" style="font-size:15px">Sonar</span>
+    <span>Made with SwiftUI and a lot of music. MIT licensed.</span>
+    <div class="links">
+      <a href="https://github.com/afterglow1251/music-player-macos-Sonar">GitHub</a>
+      <a href="https://github.com/afterglow1251/music-player-macos-Sonar/releases">Releases</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  // ── a fake but musical signal: kick every beat, snare on 2 and 4, hats ──
+  const BPM = 124, beat = 60 / BPM;
+  const t0 = performance.now();
+  const now = () => (performance.now() - t0) / 1000;
+  function bands(t, n) {
+    const ph = (t % beat) / beat, bar = Math.floor(t / beat) % 4;
+    const kick = Math.exp(-ph * 7), snare = (bar % 2) ? Math.exp(-ph * 9) : 0, hat = Math.exp(-((t % (beat / 2)) / (beat / 2)) * 10);
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const f = i / (n - 1);
+      let v = 0.55 * kick * Math.exp(-f * 6)            // low end thump
+            + 0.35 * snare * Math.exp(-((f - .35) ** 2) * 30)
+            + 0.28 * hat * Math.exp(-((f - .8) ** 2) * 20)
+            + 0.30 * (0.55 + 0.45 * Math.sin(t * 1.3 + i * .6)) * (1 - f * .55)   // pads
+            + 0.08 * Math.sin(t * 7 + i * 2.3);
+      out.push(Math.max(0, Math.min(1, v * 1.55 * (0.85 + 0.15 * Math.sin(t * .4)))));
+    }
+    return out;
+  }
+
+  function fit(c) {
+    const r = c.getBoundingClientRect();
+    if (c.width !== Math.round(r.width * dpr) || c.height !== Math.round(r.height * dpr)) {
+      c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+    }
+    return [c.width, c.height];
+  }
+
+  // ── themes: the tile gradient, bottom → top ─────────────────────────────
+  const THEMES = [
+    ["#4ade6b", "#e6f25a", "#ff5a4a"],   // classic
+    ["#38bdf8", "#a855f7", "#f472b6"],   // neon
+    ["#5b8cff", "#7aa7ff", "#dfe8ff"],   // ice
+    ["#ff9f43", "#ff5e62", "#ff2f92"],   // sunset
+    ["#d429bd", "#9a9ea3", "#66db70"],   // sonar
+  ];
+  let theme = 0;
+  const mix = (a, b, k) => {
+    const p = s => [1, 3, 5].map(j => parseInt(s.slice(j, j + 2), 16));
+    const [x, y] = [p(a), p(b)];
+    return `rgb(${x.map((v, i) => Math.round(v + (y[i] - v) * k)).join(",")})`;
+  };
+  const tileColor = (f, th) => f < .5 ? mix(th[0], th[1], f * 2) : mix(th[1], th[2], (f - .5) * 2);
+
+  // ── spectrum tiles with falling peaks (the app's signature look) ───────
+  function makeSpectrum(canvas, cols, rows) {
+    const peaks = new Array(cols).fill(0), vel = new Array(cols).fill(0);
+    let mode = "spectrum", last = now();
+    const api = {
+      set mode(m) { mode = m; },
+      draw() {
+        const [w, h] = fit(canvas), ctx = canvas.getContext("2d"), t = now(), dt = Math.min(.05, t - last); last = t;
+        ctx.clearRect(0, 0, w, h);
+        const th = THEMES[theme];
+        if (mode === "spectrum") {
+          const b = bands(t, cols), gap = Math.max(1, 2 * dpr), cw = (w - gap * (cols - 1)) / cols, rh = (h - gap * (rows - 1)) / rows;
+          for (let i = 0; i < cols; i++) {
+            const lit = Math.round(b[i] * rows);
+            for (let r = 0; r < lit; r++) {
+              ctx.fillStyle = tileColor(r / (rows - 1), th);
+              ctx.fillRect(i * (cw + gap), h - (r + 1) * rh - r * gap, cw, rh);
+            }
+            if (b[i] >= peaks[i]) { peaks[i] = b[i]; vel[i] = 0; } else { vel[i] += 2.2 * dt; peaks[i] = Math.max(0, peaks[i] - vel[i] * dt); }
+            const pr = Math.min(rows - 1, Math.round(peaks[i] * rows));
+            ctx.fillStyle = "rgba(255,255,255,.9)";
+            ctx.fillRect(i * (cw + gap), h - (pr + 1) * rh - pr * gap, cw, Math.max(2, rh * .45));
+          }
+        } else if (mode === "scope") {
+          const b = bands(t, 8);
+          ctx.lineWidth = 2.2 * dpr; ctx.lineJoin = "round";
+          for (let pass = 0; pass < 2; pass++) {
+            ctx.beginPath();
+            for (let x = 0; x <= w; x += 2 * dpr) {
+              const u = x / w;
+              let y = 0;
+              for (let k = 0; k < 8; k++) y += b[k] * Math.sin(u * (6 + k * 9) * Math.PI + t * (3 + k) + k);
+              y = h / 2 + y * h * .11 * (pass ? .6 : 1);
+              x ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+            }
+            ctx.strokeStyle = pass ? th[2] : th[0]; ctx.globalAlpha = pass ? .5 : 1; ctx.shadowColor = th[0]; ctx.shadowBlur = 14 * dpr;
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+        } else {
+          const b = bands(t, 24), cx = w / 2, cy = h / 2, R = Math.min(w, h) * .46, arms = 12;
+          ctx.globalCompositeOperation = "lighter";
+          for (let a = 0; a < arms; a++) {
+            ctx.save(); ctx.translate(cx, cy); ctx.rotate(a / arms * Math.PI * 2 + t * .25);
+            if (a % 2) ctx.scale(1, -1);
+            ctx.beginPath(); ctx.moveTo(0, 0);
+            for (let i = 0; i < b.length; i++) {
+              const r = (i / b.length) * R, off = b[i] * R * .28 * Math.sin(i * .9 + t * 2);
+              ctx.lineTo(r, off);
+            }
+            ctx.strokeStyle = tileColor(a / arms, th); ctx.lineWidth = 2 * dpr; ctx.globalAlpha = .7; ctx.stroke();
+            ctx.restore();
+          }
+          ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+        }
+      }
+    };
+    return api;
+  }
+
+  const heroViz = makeSpectrum(document.getElementById("viz"), 34, 12);
+  const bigViz = makeSpectrum(document.getElementById("bigviz"), 40, 18);
+
+  // ── waveform seek bar: mirrored bars, played part in accent ────────────
+  const wave = document.getElementById("wave"), tip = document.getElementById("tip");
+  const DUR = 228, peaksW = [];
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 160; i++) { const env = .35 + .65 * Math.sin(Math.PI * i / 160) ** .6; peaksW.push(Math.max(.08, env * (.45 + .55 * rnd()))); }
+  let pos = 72, hoverX = null;
+  wave.addEventListener("mousemove", e => { const r = wave.getBoundingClientRect(); hoverX = (e.clientX - r.left) / r.width; tip.style.left = `${Math.max(6, Math.min(94, hoverX * 100))}%`; tip.textContent = fmt(hoverX * DUR); });
+  wave.addEventListener("mouseleave", () => hoverX = null);
+  wave.addEventListener("click", e => { const r = wave.getBoundingClientRect(); pos = (e.clientX - r.left) / r.width * DUR; });
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const pad = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  function drawWave(dt) {
+    pos = (pos + dt) % DUR;
+    document.getElementById("clock").textContent = `${pad(pos)} / ${pad(DUR)}`;
+    const [w, h] = fit(wave), ctx = wave.getContext("2d"), n = peaksW.length, bw = w / n;
+    ctx.clearRect(0, 0, w, h);
+    for (let i = 0; i < n; i++) {
+      const x = i * bw, played = i / n < pos / DUR, bh = peaksW[i] * h;
+      let lift = 1;
+      if (hoverX !== null) lift = 1 + .35 * Math.exp(-((((i / n) - hoverX) * 18) ** 2));
+      ctx.fillStyle = played ? "#4ade6b" : (hoverX !== null && i / n < hoverX ? "rgba(255,255,255,.45)" : "rgba(255,255,255,.22)");
+      ctx.fillRect(x, (h - bh * lift) / 2, Math.max(1, bw - dpr), bh * lift);
+    }
+  }
+
+  // ── theme dots + mode buttons ───────────────────────────────────────────
+  const themesEl = document.getElementById("themes");
+  THEMES.forEach((th, i) => {
+    const dot = document.createElement("i");
+    dot.style.background = `linear-gradient(135deg, ${th[0]}, ${th[2]})`;
+    dot.title = "Theme";
+    if (!i) dot.classList.add("on");
+    dot.onclick = () => { theme = i; themesEl.querySelectorAll("i").forEach(d => d.classList.toggle("on", d === dot)); };
+    themesEl.append(dot);
+  });
+  document.querySelectorAll(".modes button").forEach(b => b.onclick = () => {
+    document.querySelectorAll(".modes button").forEach(x => x.classList.toggle("on", x === b));
+    bigViz.mode = b.dataset.mode;
+  });
+
+  // ── karaoke: real per-letter timing, incl. held notes ───────────────────
+  // Original demo lines. Each word: [text, start, per-letter durations...]
+  // Some letters are held ("looooow") — the Letters fill waits on them,
+  // exactly like a real ElevenLabs-timed song.
+  const LYRICS = [
+    [["Turn", 0.0], ["the", .42], ["lights", .66], ["down", 1.12], ["low", 1.6, [.12, 1.1, .2]]],
+    [["let", 3.3], ["the", 3.55], ["bassline", 3.8], ["lead", 4.6], ["the", 4.95], ["way", 5.2, [.15, .8, .25]]],
+    [["every", 6.9], ["word", 7.4], ["you", 7.85], ["know", 8.2, [.1, .12, .9, .2]]],
+    [["lights", 9.9], ["up", 10.45], ["as", 10.8], ["you", 11.05], ["sing", 11.35, [.1, .7, .15, .2]], ["it", 12.1]],
+  ];
+  const LOOP = 14;
+  const klines = document.getElementById("klines");
+  const lineEls = LYRICS.map(words => {
+    const el = document.createElement("div"); el.className = "kline";
+    words.forEach(([w, start, durs], wi) => {
+      const letters = [...w], ds = durs || letters.map(() => Math.min(.12, .5 / letters.length));
+      let t = start; const times = letters.map((_, k) => { const at = t; t += ds[k] || .08; return at; });
+      const span = document.createElement("span"); span.dataset.start = start;
+      letters.forEach((ch, k) => { const s = document.createElement("span"); s.textContent = ch; s.dataset.t = times[k]; span.append(s); });
+      el.append(span); if (wi < words.length - 1) el.append(" ");
+    });
+    klines.append(el); return el;
+  });
+  let kmode = "letters";
+  document.querySelectorAll("#kmode button").forEach(b => b.onclick = () => {
+    kmode = b.dataset.mode;
+    document.querySelectorAll("#kmode button").forEach(x => x.classList.toggle("on", x === b));
+  });
+  function drawKaraoke() {
+    const t = now() % LOOP;
+    lineEls.forEach((el, li) => {
+      const start = LYRICS[li][0][1], next = li + 1 < LYRICS.length ? LYRICS[li + 1][0][1] : LOOP - .6;
+      const active = t >= start && t < next;
+      el.classList.toggle("active", active);
+      // Only the line being sung fills — sung lines dim again, like in the app.
+      el.querySelectorAll(":scope > span").forEach(word => {
+        const ws = +word.dataset.start;
+        word.querySelectorAll("span").forEach(l => {
+          const on = kmode === "words" ? t >= ws : t >= +l.dataset.t;
+          l.classList.toggle("lit", active && on);
+        });
+      });
+    });
+  }
+
+  // ── YouTube → library demo: type, queue, download, land in the list ────
+  const ftxt = document.getElementById("ftxt"), fstatus = document.getElementById("fstatus"), fill = document.getElementById("fill"),
+        chips = document.getElementById("dlchips"), dlrows = document.getElementById("dlrows");
+  const URLS = ["youtube.com/watch?v=n30n-t1de", "youtu.be/fr1day-st4tic"], TITLES = [["Neon Tide", "Afterglow", "03:48"], ["Friday Static — Live Mix", "DJ Halcyon", "58:14"]];
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  async function dlLoop() {
+    for (;;) {
+      chips.innerHTML = ""; fill.style.transition = "none"; fill.style.width = "0"; fstatus.textContent = "";
+      while (dlrows.children.length > 2) dlrows.firstElementChild.remove();
+      for (let u = 0; u < URLS.length; u++) {
+        for (let i = 0; i <= URLS[u].length; i++) { ftxt.innerHTML = `https://${URLS[u].slice(0, i)}<span class="caret"></span>`; await sleep(38); }
+        await sleep(350);
+        const c = document.createElement("span"); c.className = "dlchip"; c.textContent = TITLES[u][0]; chips.append(c);
+        ftxt.innerHTML = `<span style="opacity:.6">Add another…</span>`;
+        await sleep(500);
+      }
+      for (let u = 0; u < URLS.length; u++) {
+        fill.style.transition = "none"; fill.style.width = "0"; await sleep(30);
+        fill.style.transition = "width 2.2s cubic-bezier(.4,0,.2,1)"; fill.style.width = "100%";
+        for (let p = 0; p <= 100; p += 5) { fstatus.textContent = p < 100 ? `Downloading ${p}%` : "Processing…"; await sleep(110); }
+        await sleep(300);
+        const [t, a, d] = TITLES[u];
+        const row = document.createElement("div"); row.className = "row newrow";
+        row.innerHTML = `<span class="note">♪</span><span><b>${t}</b><small>${a}</small></span><span class="d">${d}</span>`;
+        dlrows.prepend(row); chips.firstElementChild?.remove();
+      }
+      fstatus.textContent = ""; fill.style.width = "0"; ftxt.innerHTML = `<span style="opacity:.6">Paste a YouTube URL…</span>`;
+      await sleep(2600);
+    }
+  }
+
+  // ── the header view strip opens and closes on its own in the hero ───────
+  const strip = document.getElementById("strip");
+  if (!reduce) setInterval(() => strip.classList.toggle("open"), 2600);
+
+  // ── entrance + scroll reveals ───────────────────────────────────────────
+  requestAnimationFrame(() => document.getElementById("stage").classList.add("in"));
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .15 });
+  document.querySelectorAll(".reveal").forEach((el, i) => { el.style.transitionDelay = `${(i % 3) * 80}ms`; io.observe(el); });
+
+  // ── latest release: version badge + direct zip link ─────────────────────
+  fetch("https://api.github.com/repos/afterglow1251/music-player-macos-Sonar/releases/latest")
+    .then(r => r.ok ? r.json() : null).then(rel => {
+      if (!rel) return;
+      document.querySelectorAll(".ver").forEach(el => el.textContent = `${rel.tag_name} beta`);
+      const zip = (rel.assets || []).find(a => a.name.endsWith(".zip"));
+      if (zip) {
+        document.querySelectorAll(".dl-link").forEach(a => a.href = zip.browser_download_url);
+        document.querySelectorAll(".dl-name").forEach(c => c.textContent = zip.name);
+      }
+    }).catch(() => {});
+
+  // ── one loop drives every canvas ────────────────────────────────────────
+  let prev = now();
+  function frame() {
+    const t = now(), dt = t - prev; prev = t;
+    heroViz.draw(); bigViz.draw(); drawWave(dt); drawKaraoke();
+    requestAnimationFrame(frame);
+  }
+  if (reduce) { heroViz.draw(); bigViz.draw(); drawWave(0); drawKaraoke(); }
+  else { requestAnimationFrame(frame); dlLoop(); }
+})();
+</script>
+</body>
+</html>
