@@ -7,8 +7,8 @@ import AVFoundation
 /// Two routes, picked by what text we have:
 /// - **Forced Alignment** (preferred) — audio + the known lyrics → when each of
 ///   *those* words is sung. The words are guaranteed right; only timing is inferred.
-/// - **Speech-to-Text (Scribe)** — no lyrics anywhere: it hears the words itself.
-///   Mishearings are possible, and lines are split at pauses.
+/// - **Speech-to-Text (Scribe)** — no lyrics anywhere: it hears the words itself,
+///   letters timed too. Mishearings are possible, and lines are split at pauses.
 /// Both bill the same (per hour of audio), so a mix chapter is cut out and sent
 /// alone rather than paying for the whole mix.
 enum ElevenLabsSync {
@@ -53,7 +53,7 @@ enum ElevenLabsSync {
 
     /// Timed lyrics for `subject`, from its audio. Timestamps count from the
     /// song's own start (a chapter's, in a mix) — the cache's convention. Empty
-    /// `lines` → transcribe instead of align (word timing only, no letters).
+    /// `lines` → transcribe instead of align (still one request, letters included).
     static func timedLyrics(for subject: LyricsSubject, lines: [SourceLine]) async throws -> Output {
         guard let key = ElevenLabsKey.read() else { throw Failure.noKey }
         let audio = try await audioFile(for: subject)
@@ -69,12 +69,20 @@ enum ElevenLabsSync {
         } else {
             let response: TranscriptResponse = try await post(
                 "speech-to-text", key: key, audio: audio,
-                fields: ["model_id": "scribe_v1", "timestamps_granularity": "word", "tag_audio_events": "false"])
+                fields: ["model_id": "scribe_v1", "timestamps_granularity": "character",
+                         "tag_audio_events": "false"])
             let words = response.words.filter { $0.type == "word" }
             guard !words.isEmpty else { throw Failure.nothingHeard }
+            // Character granularity gives each heard word its letters' times, so a
+            // transcribed song gets real letter timing from this one request too.
+            // A letter without a time borrows its word's start (then clamped
+            // forward in `letters(for:from:)`).
+            let characters = words.flatMap { word in
+                (word.characters ?? []).map { AlignedChar(text: $0.text, start: $0.start ?? word.start) }
+            }
             return try build(transcriptLines(words), words: words.map {
                 AlignedWord(text: $0.text, start: $0.start, end: $0.end, loss: nil)
-            })
+            }, characters: characters)
         }
     }
 
@@ -95,8 +103,8 @@ enum ElevenLabsSync {
         let loss: Double?
     }
 
-    /// Lay `words` (one per whitespace-separated token of `lines`, in order) back
-    /// onto the lines as Enhanced LRC.
+    /// Lay the timings back onto `lines` as Enhanced LRC, one stamp per
+    /// whitespace-separated token.
     ///
     /// With `characters`, each stamped word also gets its letters' real times
     /// (the non-whitespace characters, in order, map one-to-one onto the tokens'
@@ -113,12 +121,20 @@ enum ElevenLabsSync {
     ///   line time without word stamps, when it had one, rather than a bad guess.
     static func build(_ lines: [SourceLine], words: [AlignedWord],
                       characters: [AlignedChar]? = nil) throws -> Output {
-        let tokenCount = lines.reduce(0) { $0 + tokens($1.text).count }
-        guard tokenCount == words.count, tokenCount > 0 else { throw Failure.mismatch }
+        let allTokens = lines.flatMap { tokens($0.text) }
+        guard !allTokens.isEmpty else { throw Failure.mismatch }
+        // Letters come from the characters list, which mirrors the sent text
+        // character for character — so they (and word starts taken from them)
+        // don't depend on how ElevenLabs happens to split the text into words:
+        // a lone "—" or "..." it doesn't count as a word no longer throws the
+        // whole result away. Its own word list is used only when it lines up
+        // one-to-one with our tokens (for loss and word ends), or as the sole
+        // source when there are no characters.
         let letterTimes = characters.flatMap { letters(for: lines, from: $0) }
-        var stampedLetters: [[TimeInterval]] = []
-        var tokenIndex = 0
+        let wordsMatch = words.count == allTokens.count
+        guard letterTimes != nil || wordsMatch else { throw Failure.mismatch }
 
+        var stampedLetters: [[TimeInterval]] = []
         var out: [String] = []
         var cursor = 0
         var lastTime: TimeInterval = 0
@@ -134,18 +150,19 @@ enum ElevenLabsSync {
                 }
                 continue
             }
-            let slice = Array(words[cursor..<cursor + toks.count])
+            let range = cursor..<cursor + toks.count
             cursor += toks.count
-            let lineLetters = letterTimes.map { Array($0[tokenIndex..<tokenIndex + toks.count]) }
-            tokenIndex += toks.count
-            var times = slice.enumerated().map { i, word -> TimeInterval in
+            let slice = wordsMatch ? Array(words[range]) : nil
+            let lineLetters = letterTimes.map { Array($0[range]) }
+            var times = toks.indices.map { i -> TimeInterval in
                 if let first = lineLetters?[i].first { return first }
-                let next = i + 1 < slice.count ? slice[i + 1].start : word.end
+                let word = slice![i]   // no letters → the words matched (guarded above)
+                let next = i + 1 < toks.count ? slice![i + 1].start : word.end
                 return next - word.start > 4 ? max(word.end - 0.6, word.start) : word.start
             }
             for i in times.indices { times[i] = max(times[i], i == 0 ? lastTime : times[i - 1]) }
 
-            let losses = slice.compactMap(\.loss)
+            let losses = slice?.compactMap(\.loss) ?? []
             let struggled = !losses.isEmpty && losses.reduce(0, +) / Double(losses.count) > 2.5
             if struggled, let old = line.time {
                 lastTime = max(lastTime, old)
@@ -164,7 +181,7 @@ enum ElevenLabsSync {
                 }
             }
             lastTime = max(lastTime, times.last ?? lastTime)
-            previousEnd = slice.last?.end
+            previousEnd = slice?.last?.end ?? lineLetters?.last?.last.map { $0 + 0.3 }
         }
         return Output(lrc: out.joined(separator: "\n") + "\n",
                       letters: letterTimes == nil ? nil : stampedLetters)
@@ -255,6 +272,13 @@ enum ElevenLabsSync {
         let start: TimeInterval
         let end: TimeInterval
         let type: String
+        /// Present with `timestamps_granularity=character`.
+        let characters: [TranscriptChar]?
+    }
+
+    struct TranscriptChar: Decodable {
+        let text: String
+        let start: TimeInterval?
     }
 
     private struct TranscriptResponse: Decodable {

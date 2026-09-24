@@ -119,7 +119,7 @@ struct LyricsView: View {
                                 // overwriting the song's LRC.
                                 if elevenLabs.isSet {
                                     pill {
-                                        Button(controller.lyrics.hasWordTimings ? "Re-sync" : "Sync words",
+                                        Button(controller.lyrics.hasWordTimings ? "Re-sync with ElevenLabs" : "Sync with ElevenLabs",
                                                action: syncWords)
                                             .buttonStyle(.plain)
                                     }

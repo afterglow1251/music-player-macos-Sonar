@@ -59,4 +59,36 @@ import Testing
         #expect(out.lrc == "[00:11.28]<00:11.28>So <00:11.48>high\n")
         #expect(out.letters == [[11.28, 11.34], [11.48, 11.5, 11.62, 11.7]])
     }
+
+    @Test func transcriptLettersMapOntoHeardWords() throws {
+        // What the Scribe path hands to `build`: the heard words, split into lines,
+        // and their characters flattened in order.
+        let heard = [ElevenLabsSync.TranscriptWord(text: "Take", start: 6.84, end: 7.1, type: "word",
+                                                   characters: [.init(text: "T", start: 6.84), .init(text: "a", start: 6.9),
+                                                                .init(text: "k", start: 6.98), .init(text: "e", start: nil)]),
+                     ElevenLabsSync.TranscriptWord(text: "me", start: 7.12, end: 7.3, type: "word",
+                                                   characters: [.init(text: "m", start: 7.12), .init(text: "e", start: 7.2)])]
+        let chars = heard.flatMap { word in
+            (word.characters ?? []).map { Char(text: $0.text, start: $0.start ?? word.start) }
+        }
+        let out = try ElevenLabsSync.build(ElevenLabsSync.transcriptLines(heard),
+                                           words: heard.map { Word(text: $0.text, start: $0.start, end: $0.end, loss: nil) },
+                                           characters: chars)
+        #expect(out.lrc == "[00:06.84]<00:06.84>Take <00:07.12>me\n")
+        // The untimed "e" borrows its word's start, then is clamped forward.
+        #expect(out.letters == [[6.84, 6.9, 6.98, 6.98], [7.12, 7.2]])
+    }
+
+    @Test func toleratesTheModelSplittingWordsDifferently() throws {
+        // A lone "—" in the lyrics that the model doesn't count as a word: its
+        // word list is one short, but the characters still line up with the text.
+        let text = "Run — now"
+        var t = 1.0
+        let chars = text.map { c -> Char in t += 0.1; return Char(text: String(c), start: t) }
+        let words = [Word(text: "Run", start: 1.1, end: 1.4, loss: 1),
+                     Word(text: "now", start: 1.7, end: 2.0, loss: 1)]
+        let out = try ElevenLabsSync.build([Line(text: text, time: nil)], words: words, characters: chars)
+        #expect(out.lrc == "[00:01.10]<00:01.10>Run <00:01.50>— <00:01.70>now\n")
+        #expect(out.letters?.count == 3)
+    }
 }
