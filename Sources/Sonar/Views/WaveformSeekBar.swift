@@ -133,9 +133,12 @@ struct WaveformSeekBar: View {
                     }
             )
             // Scroll over the bar to seek ±~3s per detent. Each event only moves
-            // the scrub position; the one real seek commits once the gesture goes
-            // quiet — see `ScrollSeekDebounce` for why.
-            .scrollToAdjust { units in
+            // the scrub position; the one real seek commits the moment a trackpad
+            // gesture ends (fingers lifted) or, for a wheel, once scrolling goes
+            // quiet — see `ScrollSeekDebounce` for why. The trackpad's momentum
+            // tail is ignored: it kept the scrub drifting (and the seek waiting)
+            // for seconds after a hard flick.
+            .scrollToAdjust(ignoresMomentum: true, onGestureEnd: { scrollSeek.flush() }) { units in
                 guard duration > 0 else { return }
                 let base = isScrubbing ? scrubTime : clock.currentTime
                 scrubTime = min(max(base + units * 3, 0), duration)
